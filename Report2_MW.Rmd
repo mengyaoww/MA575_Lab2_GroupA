@@ -23,7 +23,7 @@ colnames(dat_bmw)
 ```
 
 ```{r}
-#plot(dat_bmw$price)
+plot(dat_bmw$price)
 
 summary(dat_bmw)
 ```
