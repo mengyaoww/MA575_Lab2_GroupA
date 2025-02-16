@@ -1,1 +1,2 @@
-# MA575_Lab2_GroupA
+# MA575 Lab2 GroupA
+
