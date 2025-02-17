@@ -9,9 +9,8 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
 ```{r message=FALSE}
-setwd("/Users/mengyaow/Desktop/Graduate/MA575/Lab_project/project2")
+# setwd("/Users/mengyaow/Desktop/Graduate/MA575/Lab_project/project2")
 
 library(ggplot2)
 library(GGally)
@@ -19,21 +18,22 @@ library(GGally)
 
 ```{r}
 dat_bmw <- read.csv("./BMWpricing_updated.csv")
-#summary(dat_bmw)
+summary(dat_bmw)
 ```
 
-
 #### address missing data
+
 ```{r}
 dat_bmw[dat_bmw$mileage < 0, "mileage"] <- NA
 
 dat_bmw$mileage <- as.numeric(dat_bmw$mileage)
 dat_bmw$engine_power <- as.numeric(dat_bmw$engine_power)
 dat_bmw$price <- as.numeric(dat_bmw$price)
+summary(dat_bmw)
 ```
 
-
 #### scatterplot matrix
+
 ```{r}
 dat_bmw2 <- dat_bmw[,c("price", "mileage", "engine_power")]
 dat_bmw2 <- dat_bmw2[complete.cases(dat_bmw2),]
@@ -45,6 +45,7 @@ ggpairs(dat_bmw2,
 ```
 
 #### scatter plot of price and mileage
+
 ```{r}
 ggplot(data = dat_bmw2, mapping = aes(x = mileage, y = price)) +
   geom_point(pch=19, cex=0.3) +
@@ -54,12 +55,11 @@ ggplot(data = dat_bmw2, mapping = aes(x = mileage, y = price)) +
   theme_bw()
 ```
 
-
 #### model fitting
+
+We fitted a Ordinary Least Square regression model to predict BMW car prices using mileage as a predictor. The estimated intercept $\hat{\beta_0}$ of 24600 represents the expected price when mileage is zero, and the slope coefficient $\hat{\beta_1}$ of around -0.062 shows that each additional mileage reduces the price of the vehicle by roughly 6 cents. Both parameter estimates are highly statistically significant with a p-value less than $2\times 10^{-16}$, suggesting that mileage may have a significant relationship with price. The large F-statistic with a p-value, also less than $2\times 10^{-16}$ shows that this model is significantly better than the null model (i.e., a model with no predictors). However, the $R^2$ of 0.1668 indicates that mileage alone explains only about 16.7% of the variation in price, indicating that additional factors likely also influence the price.
+
 ```{r}
 mod1 <- lm(price ~ mileage, data = dat_bmw2)
 summary(mod1)
 ```
-
-
-
