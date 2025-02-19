@@ -35,14 +35,18 @@ dat_bmw[dat_bmw$price > 150000, "price"] <- NA
 
 ### Converting mileage, engine power, and price into numeric
 dat_bmw[,c(3,4,17)] <- apply(dat_bmw[,c(3,4,17)], 2, as.numeric)
-summary(dat_bmw)
+
+### Create a data frame only has the variable of interests
+dat_bmw2 <- dat_bmw[,c("price", "mileage", "engine_power")]
+
+### Drop the data point with NA
+dat_bmw2 <- dat_bmw2[complete.cases(dat_bmw2),]
+# summary(dat_bmw)
 ```
 
 #### scatterplot matrix
 
 ```{r}
-dat_bmw2 <- dat_bmw[,c("price", "mileage", "engine_power")]
-dat_bmw2 <- dat_bmw2[complete.cases(dat_bmw2),]
 ggpairs(dat_bmw2,
         upper=list(continuous=wrap("points", alpha=0.3, size=0.1)),
         lower=list(continuous=wrap('cor', size=4))) +
