@@ -24,21 +24,15 @@ dat_bmw <- read.csv("BMWpricing_updated.csv")
 #summary(dat_bmw)
 ```
 
-#### address missing data and outliers
+#### address missing data
 
 ```{r}
-### Assigning NA to car with mileage > 50,0000 miles or negative mileage
-dat_bmw[dat_bmw$mileage > 500000 | dat_bmw$mileage < 0, "mileage"] <- NA
-
-### Assigning NA to car with price > 150000 usd
-dat_bmw[dat_bmw$price > 150000, "price"] <- NA
-
+### Assigning NA to data points with negative mileage
+dat_bmw[dat_bmw$mileage < 0, "mileage"] <- NA
 ### Converting mileage, engine power, and price into numeric
 dat_bmw[,c(3,4,17)] <- apply(dat_bmw[,c(3,4,17)], 2, as.numeric)
-
 ### Create a data frame only has the variable of interests
 dat_bmw2 <- dat_bmw[,c("price", "mileage", "engine_power")]
-
 ### Drop the data point with NA
 dat_bmw2 <- dat_bmw2[complete.cases(dat_bmw2),]
 # summary(dat_bmw)
@@ -62,17 +56,21 @@ We further transform price based on the log-likelihood for the Box-Cox transform
 In the scatter plot of log(price) and mileage, we observe some potential outliers with low prices and short mileage.
 
 ```{r}
-s1 <- ggplot(data = dat_bmw2, mapping = aes(x = mileage, y = price)) +
-  geom_point(pch=19, cex=0.3) +
-  geom_point(data = subset(dat_bmw2, mileage > 500000), mapping = aes(x = mileage, y = price), pch=19, cex=1, color = "red") +
-  geom_point(data = subset(dat_bmw2, price > 100000), mapping = aes(x = mileage, y = price), pch=19, cex=1, color = "blue") +
+# Scatter plot of price vs. mileage with highlighted outliers
+scatterPlotPriceMileage <- ggplot(data = dat_bmw2, mapping = aes(x = mileage, y = price)) +
+  geom_point(pch=19, cex=0.3) +  # Default points
+  geom_point(data = subset(dat_bmw2, mileage > 500000), mapping = aes(x = mileage, y = price), pch=19, cex=1, color = "red") +  # Highlight points with mileage > 500000 in red
+  geom_point(data = subset(dat_bmw2, price > 100000), mapping = aes(x = mileage, y = price), pch=19, cex=1, color = "blue") + # Highlight points with price > 100000 in blue
   labs(title = "Scatter plot between price and mileage") +
   theme_bw() + theme(title = element_text(size=8)) 
 
+# Box-Cox transformation for the price variable
 boxcox_price <- boxcox(lm(dat_bmw2$price ~ 1), plotit = F)
-boxcox_price2 <- data.frame("lambda" = boxcox_price$x, "ll" = boxcox_price$y)
+boxcox_priceDF <- data.frame("lambda" = boxcox_price$x, "ll" = boxcox_price$y)
 maxlabmda_price <- boxcox_price$x[which.max(boxcox_price$y)]
-box1 <- ggplot(data = boxcox_price2, mapping = aes(x = lambda, y = ll)) +
+
+# Box-cox Plot for the price variable
+boxcoxPlotPrice <- ggplot(data = boxcox_priceDF, mapping = aes(x = lambda, y = ll)) +
   geom_line(color = "black", linewidth = 0.5) +
   geom_vline(xintercept = maxlabmda_price, linetype = "dashed", color = "red") +
   geom_hline(yintercept = max(boxcox_price$y) - qchisq(0.95, df = 1)/2, linetype = "dashed", color = "blue") +
@@ -82,10 +80,13 @@ box1 <- ggplot(data = boxcox_price2, mapping = aes(x = lambda, y = ll)) +
   annotate("text", label = paste0("lambda ==", maxlabmda_price), x = 1, y = -30000, parse = T) +
   theme_bw() + theme(title = element_text(size=8)) 
 
+# Box-cox transformation for the mile variable
 boxcox_mile <- boxcox(lm(dat_bmw2$mileage ~ 1), plotit = F)
-boxcox_mile2 <- data.frame("lambda" = boxcox_mile$x, "ll" = boxcox_mile$y)
+boxcox_mileDF <- data.frame("lambda" = boxcox_mile$x, "ll" = boxcox_mile$y)
 maxlabmda_mile <- boxcox_mile$x[which.max(boxcox_mile$y)]
-box2 <- ggplot(data = boxcox_mile2, mapping = aes(x = lambda, y = ll)) +
+
+# Box-cox Plot for the mile variable
+boxcoxPlotMile <- ggplot(data = boxcox_mileDF, mapping = aes(x = lambda, y = ll)) +
   geom_line(color = "black", linewidth = 0.5) +
   geom_vline(xintercept = maxlabmda_mile, linetype = "dashed", color = "red") +
   geom_hline(yintercept = max(boxcox_mile$y) - qchisq(0.95, df = 1)/2, linetype = "dashed", color = "blue") +
@@ -95,15 +96,27 @@ box2 <- ggplot(data = boxcox_mile2, mapping = aes(x = lambda, y = ll)) +
   annotate("text", label = paste0("lambda ==", maxlabmda_mile), x = 1, y = -30000, parse = T) +
   theme_bw() + theme(title = element_text(size=8)) 
 
+# Create a column of logprice in dat_bmw2
 dat_bmw2 <- dat_bmw2 %>% mutate(logprice = log(price))
-s2 <- ggplot(data = dat_bmw2, mapping = aes(x = mileage, y = logprice)) +
+
+# Scatter plot of logprice vs. mileage with highlighted outliers
+scatterPlotLogPriceMileage <- ggplot(data = dat_bmw2, mapping = aes(x = mileage, y = logprice)) +
   geom_point(pch=19, cex=0.3) +
   geom_point(data = subset(dat_bmw2, mileage > 500000), mapping = aes(x = mileage, y = logprice), pch=19, cex=1, color = "red") +
   geom_point(data = subset(dat_bmw2, logprice > log(100000)), mapping = aes(x = mileage, y = logprice), pch=19, cex=1, color = "blue") +
   labs(title = "Scatter plot between log(price) and mileage") +
   theme_bw() + theme(title = element_text(size=8)) 
 
-plot_grid(s1, box1, box2, s2, align = "h")
+plot_grid(scatterPlotPriceMileage, boxcoxPlotPrice, boxcoxPlotMile, scatterPlotLogPriceMileage, align = "h")
+```
+
+### Outlier
+
+```{r}
+### Assigning NA to car with mileage > 50,0000 miles
+dat_bmw[dat_bmw$mileage > 500000, "mileage"] <- NA 
+### Assigning NA to car with price > 150000 usd
+dat_bmw[dat_bmw$price > 150000, "price"] <- NA
 ```
 
 #### model fitting
