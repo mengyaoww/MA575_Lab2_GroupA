@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r message=FALSE}
+### load the library
 library(dplyr)
 library(ggplot2)
 library(cowplot) #to arrange ggplot
@@ -18,17 +19,23 @@ library(MASS) #for boxcox
 ```
 
 ```{r}
-dat_bmw <- read.csv("./BMWpricing_updated.csv")
+### load the dataset
+dat_bmw <- read.csv("BMWpricing_updated.csv")
 #summary(dat_bmw)
 ```
 
-#### address missing data
+#### address missing data and outliers
 
 ```{r}
-dat_bmw[dat_bmw$mileage < 0, "mileage"] <- NA
+### Assigning NA to car with mileage > 50,0000 miles or negative mileage
+dat_bmw[dat_bmw$mileage > 500000 | dat_bmw$mileage < 0, "mileage"] <- NA
 
+### Assigning NA to car with price > 150000 usd
+dat_bmw[dat_bmw$price > 150000, "price"] <- NA
+
+### Converting mileage, engine power, and price into numeric
 dat_bmw[,c(3,4,17)] <- apply(dat_bmw[,c(3,4,17)], 2, as.numeric)
-#summary(dat_bmw)
+summary(dat_bmw)
 ```
 
 #### scatterplot matrix
@@ -43,11 +50,13 @@ ggpairs(dat_bmw2,
   theme_bw()
 ```
 
-#### scatter plot of price and mileage   
-We first set the negative mileage (in one sample) as the missing data and excluded it in our following analysis.    
-Our scatter plot shows a negative correlation between price and mileage, that is price tends to decrease with the longer mileage. However, this relationship is not strongly linear and a straight-line regression model may not be the best option. We find some problems in our data: 1) Both price and mileage follow highly right-skewed distributions; 2) There are some high leverage points on the right side of the scatter plot, especially the red point with around 1000000 miles; 3) Outliers with extreme high sold prices are observed on the top-left of the plot, especially these blue points with price over 100000.     
-We further transform price based on the log-likelihood for the Box-Cox transformation method. Though the $\lambda$ with the greatest log-likelihood ($\lambda_{price} = 0.4, \lambda_{mileage} = 0.4$) and its 95% CI do not include 0, 0.5, and 1, there are slight differences in log-likelihood for price when $\lambda \in [0,0.5]$ and for mileage when $\lambda \in [0.5,1]$. For interpretability, we finally apply log-transformation on the price and keep the mileage in the data.   
+#### scatter plot of price and mileage
+
+We first set the negative mileage (in one sample) as the missing data and excluded it in our following analysis.\
+Our scatter plot shows a negative correlation between price and mileage, that is price tends to decrease with the longer mileage. However, this relationship is not strongly linear and a straight-line regression model may not be the best option. We find some problems in our data: 1) Both price and mileage follow highly right-skewed distributions; 2) There are some high leverage points on the right side of the scatter plot, especially the red point with around 1000000 miles; 3) Outliers with extreme high sold prices are observed on the top-left of the plot, especially these blue points with price over 100000.\
+We further transform price based on the log-likelihood for the Box-Cox transformation method. Though the $\lambda$ with the greatest log-likelihood ($\lambda_{price} = 0.4, \lambda_{mileage} = 0.4$) and its 95% CI do not include 0, 0.5, and 1, there are slight differences in log-likelihood for price when $\lambda \in [0,0.5]$ and for mileage when $\lambda \in [0.5,1]$. For interpretability, we finally apply log-transformation on the price and keep the mileage in the data.\
 In the scatter plot of log(price) and mileage, we observe some potential outliers with low prices and short mileage.
+
 ```{r}
 s1 <- ggplot(data = dat_bmw2, mapping = aes(x = mileage, y = price)) +
   geom_point(pch=19, cex=0.3) +
@@ -93,7 +102,7 @@ s2 <- ggplot(data = dat_bmw2, mapping = aes(x = mileage, y = logprice)) +
 plot_grid(s1, box1, box2, s2, align = "h")
 ```
 
-#### model fitting    
+#### model fitting
 
 We fitted a Ordinary Least Square regression model to predict BMW car prices using mileage as a predictor. The estimated intercept $\hat{\beta_0}$ of 24600 represents the expected price when mileage is zero, and the slope coefficient $\hat{\beta_1}$ of around -0.062 shows that each additional mileage reduces the price of the vehicle by roughly 6 cents. Both parameter estimates are highly statistically significant with a p-value less than $2\times 10^{-16}$, suggesting that mileage may have a significant relationship with price. The large F-statistic with a p-value, also less than $2\times 10^{-16}$ shows that this model is significantly better than the null model (i.e., a model with no predictors). However, the $R^2$ of 0.1668 indicates that mileage alone explains only about 16.7% of the variation in price, indicating that additional factors likely also influence the price.
 
