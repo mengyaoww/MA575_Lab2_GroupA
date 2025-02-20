@@ -6,7 +6,10 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+  echo = TRUE,    # Show the R code in the final output.
+  fig.pos = "!h"  # Suggests to position figures "here" in the output.
+)
 ```
 
 ```{r message=FALSE}
@@ -16,15 +19,11 @@ library(ggplot2)
 library(cowplot) #to arrange ggplot
 library(GGally)
 library(MASS) #for boxcox
-```
-
-```{r}
-### load the dataset
+### load the data
 dat_bmw <- read.csv("BMWpricing_updated.csv")
-#summary(dat_bmw)
 ```
 
-#### address missing data
+### address missing data
 
 ```{r}
 ### Assigning NA to data points with negative mileage
@@ -38,14 +37,16 @@ dat_bmw2 <- dat_bmw2[complete.cases(dat_bmw2),]
 # summary(dat_bmw)
 ```
 
-#### scatterplot matrix
+### scatterplot matrix
 
-```{r}
+```{r, fig.width=6, fig.height=4, fig.show = "hold"}
 ggpairs(dat_bmw2,
-        upper=list(continuous=wrap("points", alpha=0.3, size=0.1)),
-        lower=list(continuous=wrap('cor', size=4))) +
-  labs(title = "Pairs plot: distribution and correlation between price, mileage, and engine power") +
-  theme_bw()
+        upper = list(continuous = wrap("points", alpha = 0.3, size = 0.1)),
+        lower = list(continuous = wrap("cor", size = 4))) +
+  labs(title = "Distribution and Correlation between Price, Mileage, and Engine Power") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+        axis.text.y = element_text(size = 8))
 ```
 
 #### scatter plot of price and mileage
@@ -110,20 +111,46 @@ scatterPlotLogPriceMileage <- ggplot(data = dat_bmw2, mapping = aes(x = mileage,
 plot_grid(scatterPlotPriceMileage, boxcoxPlotPrice, boxcoxPlotMile, scatterPlotLogPriceMileage, align = "h")
 ```
 
-### Outlier
+### Outliers
 
 ```{r}
+modelDF <- dat_bmw2
 ### Assigning NA to car with mileage > 50,0000 miles
-dat_bmw[dat_bmw$mileage > 500000, "mileage"] <- NA 
-### Assigning NA to car with price > 150000 usd
-dat_bmw[dat_bmw$price > 150000, "price"] <- NA
+modelDF[modelDF$mileage > 500000, "mileage"] <- NA 
+### Assigning NA to car with price > 100000 usd
+modelDF[modelDF$price > 100000, "price"] <- NA
+modelDF <- modelDF[complete.cases(modelDF),]
+modelDF$logprice <- log(modelDF$price)
 ```
 
 #### model fitting
 
-We fitted a Ordinary Least Square regression model to predict BMW car prices using mileage as a predictor. The estimated intercept $\hat{\beta_0}$ of 24600 represents the expected price when mileage is zero, and the slope coefficient $\hat{\beta_1}$ of around -0.062 shows that each additional mileage reduces the price of the vehicle by roughly 6 cents. Both parameter estimates are highly statistically significant with a p-value less than $2\times 10^{-16}$, suggesting that mileage may have a significant relationship with price. The large F-statistic with a p-value, also less than $2\times 10^{-16}$ shows that this model is significantly better than the null model (i.e., a model with no predictors). However, the $R^2$ of 0.1668 indicates that mileage alone explains only about 16.7% of the variation in price, indicating that additional factors likely also influence the price.
+We have used an Ordinary Least Square regression model to predict the natural logrithm of BMW car prices from mileage. The model may be represented as:
+
+$$
+log(price) = \beta_0+\beta_1\times mileage + \epsilon 
+$$
+
+The residuals tell us about the difference between the model-predicted values and the actual logprice values. These should ideally be symmetrically distributed around zero, and that would be a good-behaved model. But the minimum of residual is –5.1907. However, the minimum of residual is –5.1907. That means that, for at least one observation, the model-predicted log(price) is much larger than the actual value.
+
+The "Coefficients" section provides us with detailed statistics for the intercept and the mileage coefficient. The intercept is estimated to be 10.17 with very small standard error (0.02175) and thus having an extremely large t-value of 467.7 and an extremely small p-value of less than 2e-16. This is very strong evidence against the null hypothesis that the intercept is zero. Similarly, mileage coefficient is also estimated as –4.746e-06, which means that for one unit increase in mileage, logprice decreases by about 4.746e-06 units. Its standard error is 1.425e-07, which yields a t-value of –33.3 and a p-value similarly less than 2e-16. These allow us to reject the null hypothesis for both coefficients, meaning mileage is a statistically significant logprice predictor.
+
+Besides the individual coefficients, the fit of the entire model is also tested by means of the F-test. The F-statistic of 1109 with degrees of freedom 1 and 4837, and p-value smaller than $2.2 \times 10^{-16}$ tests whether the model that includes mileage as a predictor explains significantly more variation in log(price) than does a model with no predictors. This result confirms that our model as a whole is statistically significant although mileage by itself explains only about 18.65% of the variation in log(price) (as indicated by the Multiple R-squared of 0.1865). The quite low R-squared does suggest, however, that while mileage is an important predictor, there are other variables that probably have roles to play in explaining variations in car price.
 
 ```{r}
-mod1 <- lm(price ~ mileage, data = dat_bmw2)
+mod1 <- lm(logprice ~ mileage, data = modelDF)
 summary(mod1)
+```
+
+```{r}
+# Create a scatter plot with the best-fit line
+# Add predicted values to the dataset
+modelDF$predLinear <- predict(mod1)
+
+# Create the scatter plot with the best-fit line
+ggplot(modelDF, aes(x = mileage, y = logprice)) +
+  geom_point(size = 0.15, color = 'blue') +                       # Scatter plot points
+  geom_line(aes(x = mileage, y = predLinear, color = "blue")) +     # Best-fit line from predictions
+  scale_color_discrete(name = "Prediction", labels = c("Linear")) + # Legend for the line
+  theme_bw()
 ```
