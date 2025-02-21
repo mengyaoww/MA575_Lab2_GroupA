@@ -12,21 +12,14 @@ knitr::opts_chunk$set(
 )
 ```
 
+### Loading the Library and Dataset
+
 ```{r message=FALSE}
-### load the library
-library(dplyr)
-library(ggplot2)
-library(cowplot) #to arrange ggplot
-library(GGally)
-library(MASS) #for boxcox
+mylibrary <- c("dplyr", "ggplot2", "cowplot", "GGally", "MASS")
+invisible(lapply(mylibrary, library, character.only = TRUE))
 ### load the data
 dat_bmw <- read.csv("BMWpricing_updated.csv")
-```
-
-### address missing data
-
-```{r}
-### Assigning NA to data points with negative mileage
+### Assigning NA to data points with negative mileage 
 dat_bmw[dat_bmw$mileage < 0, "mileage"] <- NA
 ### Converting mileage, engine power, and price into numeric
 dat_bmw[,c(3,4,17)] <- apply(dat_bmw[,c(3,4,17)], 2, as.numeric)
@@ -34,7 +27,6 @@ dat_bmw[,c(3,4,17)] <- apply(dat_bmw[,c(3,4,17)], 2, as.numeric)
 dat_bmw2 <- dat_bmw[,c("price", "mileage", "engine_power")]
 ### Drop the data point with NA
 dat_bmw2 <- dat_bmw2[complete.cases(dat_bmw2),]
-# summary(dat_bmw)
 ```
 
 ### scatterplot matrix
@@ -142,6 +134,7 @@ Besides the individual coefficients, the fit of the entire model is also tested 
 mod1 <- lm(logprice ~ mileage, data = modelDF)
 summary(mod1)
 ```
+In the plot below, we overlay the scatter plot of mileage vs price with the linear regression line. We can see that as mileage increases, log‐price will decrease overall. But there is plenty of scatter around that best‐fit line. Particularly, there are a few points at the low end of log‐price (close to 5–6 on the y‐axis) that are rather far away from the rest of the data—these points are potential high‐leverage points for the regression because they are far out in mileage and have exceptionally low log‐prices. They can pull the regression line down more than if they were not present. Despite those outliers, the linear fit still shows the general inverse relation (higher mileage → lower log‐price), but it does not explain all of the price variability, given the broad scatter of points. So we can conclude that simple linear regression is not a good fit here. A multiple regression model would be a better choice as it would account for the variation in price that is not accounted for by mileage alone.
 
 ```{r}
 # Create a scatter plot with the best-fit line
