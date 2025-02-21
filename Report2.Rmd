@@ -1,15 +1,16 @@
 ---
 title: "Report 2"
-subtitle: "Lab2 Group A"
+subtitle: "Lab2 Group A: Lee, Joshua; Liu, Kaiyi; Pulsone, Nathaniel; Wang, Mengyao; Xu, Zexian; Yang, Xiaojing"
 output: pdf_document
 subparagraph: yes
 header-includes:
   \usepackage{titlesec}
   \titlespacing{\title}{0pt}{\parskip}{-\parskip}
   \usepackage{titling}
-  \setlength{\droptitle}{-5cm}
+  \setlength{\droptitle}{-10em}
 ---
-\vspace{-25truemm}
+
+\vspace{-10truemm}
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
@@ -18,7 +19,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-### Loading the Library and Dataset
+### Loading the Library and DataSet
 
 ```{r message=FALSE}
 mylibrary <- c("dplyr", "ggplot2", "cowplot", "GGally", "MASS")
@@ -35,9 +36,15 @@ dat_bmw2 <- dat_bmw[,c("price", "mileage", "engine_power")]
 dat_bmw2 <- dat_bmw2[complete.cases(dat_bmw2),]
 ```
 
-### scatterplot matrix
+### Variable Selection
 
-```{r, fig.width=6, fig.height=4, fig.show = "hold"}
+Preliminary data visualization and analysis will utilize an ordinary least-square simple linear regression model to study variable relationships. The response variable for the model will be the auction price of a BMW car, and the first predictor will be the car’s mileage. Most of the models constructed in this study will use price as the response variable, as the price of a car is what we want to be able to predict. Given that the mileage of a car tends to be the most important factor people consider when buying a used car, it would be useful to study the relationship between price and mileage.
+
+As we shall see, car mileage appears to be the most appropriate predictor for a simple linear regression of price for a number of reasons. First, the mileage has the largest variance of all possible predictors, which will give an estimate for the model’s slope with relatively low standard error. In addition, mileage seems to have the most ‘continuous’ distribution between the two numeric variables (the other of which being the car’s engine power), meaning it has minimal “variance clustering” around particular values, and also minimal gaps across the range of collected data. Notably, there are a few weaknesses to the SLR model that should be considered. Most importantly, the price seems to exponentially decay with mileage, rather than sharing a linear relationship. Related to this, there is clearly heteroscedasticity in price across mileage, as the data is clustered around its lower boundary (price = 0).
+
+### Scatterplot Matrix
+
+```{r, echo = F, fig.width=6, fig.height=3}
 ggpairs(dat_bmw2,
         upper = list(continuous = wrap("points", alpha = 0.3, size = 0.1)),
         lower = list(continuous = wrap("cor", size = 4))) +
@@ -48,7 +55,7 @@ ggpairs(dat_bmw2,
         title = element_text(size = 8))
 ```
 
-#### scatter plot of price and mileage
+### Scatter Plot of Price against Mileage
 
 We first set the negative mileage (in one sample) as the missing data and excluded it in our following analysis.\
 Our scatter plot shows a negative correlation between price and mileage, indicating that price tends to decrease as mileage increases. However, this relationship is not strongly linear and a straight-line regression model may not be the best option. We find some problems in our data: 1) Both price and mileage follow highly right-skewed distributions; 2) High-leverage points appear on the right side of the scatter plot, particularly the red point with approximately 1,000,000 miles; 3) Outliers with extreme high sold prices are observed on the top-left of the plot, especially these blue points with price over 100000.\
@@ -112,6 +119,8 @@ plot_grid(scatterPlotPriceMileage, boxcoxPlotPrice, boxcoxPlotMile, scatterPlotL
 
 ### Outliers
 
+Before, we fit the model, we removed the outliers we observed from the scatter plot (price \> 100000 and mileage \> 500000).
+
 ```{r}
 modelDF <- dat_bmw2
 ### Assigning NA to car with mileage > 50,0000 miles
@@ -122,17 +131,17 @@ modelDF <- modelDF[complete.cases(modelDF),]
 modelDF$logprice <- log(modelDF$price)
 ```
 
-#### model fitting
+### Model Fitting
 
-We applied an Ordinary Least Square regression model to predict the natural logrithm of BMW car prices from mileage. The model may be represented as:
+We applied an Ordinary Least Square regression model to predict the natural logarithm of BMW car prices from mileage. The model may be represented as:
 
 $$
 log(price) = \beta_0+\beta_1\times mileage + \epsilon 
 $$
 
-The residuals represent the difference between the model-predicted values and the actual log(price) values. Ideally, they should be symmetrically distributed around zero for a well-behaved model. But the minimum of residual is –5.1907. However, the minimum of residual is –5.1907. That means that, for at least one observation, the model-predicted log(price) is much larger than the actual value.
+The residuals represent the difference between the model-predicted values and the actual log(price) values. Ideally, they should be symmetrically distributed around zero for a well-behaved model. However, the minimum of residual is –5.1907. That means that, for at least one observation, the model-predicted log(price) is much larger than the actual value.
 
-The "Coefficients" section provides us with detailed statistics for the intercept and the mileage coefficient. The intercept is estimated to be 10.17 with very small standard error (0.02175) and thus having an extremely large t-value of 467.7 and an extremely small p-value of less than 2e-16. This is very strong evidence against the null hypothesis that the intercept is zero. Similarly, mileage coefficient is also estimated as –4.746e-06, indicating that for one unit increase in mileage, logprice decreases by about 4.746e-06 units. Its standard error is 1.425e-07, which yields a t-value of –33.3 and a p-value similarly less than 2e-16. These allow us to reject the null hypothesis for both coefficients, meaning mileage is a statistically significant logprice predictor.
+The Coefficients section provides us with detailed statistics for the intercept and the mileage coefficient. The intercept is estimated to be 10.17 with very small standard error (0.02175) and thus having an extremely large t-value of 467.7 and an extremely small p-value of less than $2 \times 10^{-16}$. This is very strong evidence against the null hypothesis that the intercept is zero. Similarly, mileage coefficient is also estimated as $–4.746 \times 10^{-06}$, indicating that for one unit increase in mileage, logprice decreases by about $4.746 \times 10^{-06}$ units. Its standard error is $1.425 \times 10^{-07}$, which yields a t-value of –33.3 and a p-value similarly less than $2 \times 10^{-16}$. These allow us to reject the null hypothesis for both coefficients, meaning mileage is a statistically significant logprice predictor.
 
 Besides the individual coefficients, the fit of the entire model is also tested by means of the F-test. The F-statistic of 1109 with degrees of freedom 1 and 4837, and p-value smaller than $2.2 \times 10^{-16}$ tests whether the model that includes mileage as a predictor explains significantly more variation in log(price) than does a model with no predictors. This result confirms that our model as a whole is statistically significant although mileage by itself explains only about 18.65% of the variation in log(price) (as indicated by the Multiple R-squared of 0.1865). The relatively low R-squared value suggests that while mileage is a significant predictor, other variables likely contribute to the variation in car prices.
 
@@ -140,6 +149,8 @@ Besides the individual coefficients, the fit of the entire model is also tested 
 mod1 <- lm(logprice ~ mileage, data = modelDF)
 summary(mod1)
 ```
+
+### Scatter Plot with Best fit Line
 
 In the plot below, we overlay the scatter plot of mileage vs price with the linear regression line. We can see that as mileage increases, log‐price will decrease overall. But there is plenty of scatter around that best‐fit line. Particularly, there are a few points at the low end of log‐price (close to 5–6 on the y‐axis) that are rather far away from the rest of the data—these points are potential high‐leverage points for the regression because they are far out in mileage and have exceptionally low log‐prices. They can pull the regression line down more than if they were not present. Despite those outliers, the linear fit still shows the general inverse relation (higher mileage → lower log‐price), but it does not explain all of the price variability, given the broad scatter of points. So we can conclude that simple linear regression is not a good fit here. A multiple regression model would be a better choice as it would account for the variation in price that is not accounted for by mileage alone.
 
@@ -155,3 +166,15 @@ ggplot(modelDF, aes(x = mileage, y = logprice)) +
   scale_color_discrete(name = "Prediction", labels = c("Linear")) + # Legend for the line
   theme_bw()
 ```
+
+### Contribution
+
+Nathan Pulsone:  wrote the intro variable selection section \\\\
+
+Zexian Xu: revised Report 1 according to comments from TA \\\\
+
+Mengyao Wang: draw and interpreted scatterplot matrix and scatter plot of price and mileage \\\\
+
+Xiaojing Yang: revised and edit the analysis for report 2 \\\\
+
+Kaiyi Liu: Fitted the linear model, and wrote the interpretation for it.
