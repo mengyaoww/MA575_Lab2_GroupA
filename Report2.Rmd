@@ -1,9 +1,15 @@
 ---
 title: "Report 2"
-author: "Lab2 GroupA"
-date: "2025-02-07"
+subtitle: "Lab2 Group A"
 output: pdf_document
+subparagraph: yes
+header-includes:
+  \usepackage{titlesec}
+  \titlespacing{\title}{0pt}{\parskip}{-\parskip}
+  \usepackage{titling}
+  \setlength{\droptitle}{-5cm}
 ---
+\vspace{-25truemm}
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
@@ -134,6 +140,7 @@ Besides the individual coefficients, the fit of the entire model is also tested 
 mod1 <- lm(logprice ~ mileage, data = modelDF)
 summary(mod1)
 ```
+
 In the plot below, we overlay the scatter plot of mileage vs price with the linear regression line. We can see that as mileage increases, log‐price will decrease overall. But there is plenty of scatter around that best‐fit line. Particularly, there are a few points at the low end of log‐price (close to 5–6 on the y‐axis) that are rather far away from the rest of the data—these points are potential high‐leverage points for the regression because they are far out in mileage and have exceptionally low log‐prices. They can pull the regression line down more than if they were not present. Despite those outliers, the linear fit still shows the general inverse relation (higher mileage → lower log‐price), but it does not explain all of the price variability, given the broad scatter of points. So we can conclude that simple linear regression is not a good fit here. A multiple regression model would be a better choice as it would account for the variation in price that is not accounted for by mileage alone.
 
 ```{r}
