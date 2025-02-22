@@ -169,12 +169,12 @@ ggplot(modelDF, aes(x = mileage, y = logprice)) +
 
 ### Contribution
 
-Nathan Pulsone: wrote the intro variable selection section \\\\
+Nathan Pulsone: wrote the intro variable selection section 
 
-Zexian Xu: revised Report 1 according to comments from TA \\\\
+Zexian Xu: revised Report 1 according to comments from TA 
 
-Mengyao Wang: draw and interpreted scatterplot matrix and scatter plot of price and mileage \\\\
+Mengyao Wang: draw and interpreted scatterplot matrix and scatter plot of price and mileage
 
-Xiaojing Yang: revised and edit the analysis for report 2 \\\\
+Xiaojing Yang: revised and edit the analysis for report 2
 
 Kaiyi Liu: Fitted the linear model, and wrote the interpretation for it.
