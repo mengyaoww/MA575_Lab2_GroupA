@@ -1,0 +1,58 @@
+---
+title: "Report3"
+subtitle: "Lab2 Group A: Lee, Joshua; Liu, Kaiyi; Pulsone, Nathaniel; Wang, Mengyao; Xu, Zexian; Yang, Xiaojing"
+output: pdf_document
+subparagraph: yes
+header-includes:
+  \usepackage{titlesec}
+  \titlespacing{\title}{0pt}{\parskip}{-\parskip}
+  \usepackage{titling}
+  \setlength{\droptitle}{-10em}
+---
+
+\vspace{-10truemm}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,    # Show the R code in the final output.
+  fig.pos = "!h"  # Suggests to position figures "here" in the output.
+)
+```
+
+### Loading the Library and DataSet
+
+```{r message=FALSE}
+mylibrary <- c("tidyverse", "cowplot", "GGally", "MASS")
+invisible(lapply(mylibrary, library, character.only = TRUE))
+### load the data
+dat_bmw <- read.csv("BMWpricing_updated.csv")
+```
+### Data Overview
+
+```{r, echo = F}
+head(dat_bmw)
+length(unique(dat_bmw$model_key))
+unique(dat_bmw$paint_color)
+unique(dat_bmw$fuel)
+
+range(as.Date(dat_bmw$registration_date, format = "%d/%m/%Y"), na.rm=T)
+range(as.Date(dat_bmw$sold_at, format = "%d/%m/%Y"), na.rm=T)
+
+dat_bmw[,c("price", "mileage", "engine_power")]|>
+  pivot_longer(everything(), values_to = "Value", names_to = "Variable") |>
+  ggplot() + geom_boxplot(aes(x=Variable, y=Value, color=Variable)) +
+  labs(title = "Boxplots for Continuous Variables (Raw)")
+
+cbind(dat_bmw)|>
+  ggplot(aes(x = as.Date(registration_date, format = "%d/%m/%Y"), y = price)) +
+  geom_point() + 
+  labs(title = "Price by Vehicle Registration Date") +
+  xlab("Registration Date")
+
+cbind(dat_bmw)|>
+  ggplot(aes(x = as.Date(sold_at, format = "%d/%m/%Y"), y = price)) +
+  geom_point() + 
+  labs(title = "Price by Date Sold") +
+  xlab("Date Sold")
+
+```
