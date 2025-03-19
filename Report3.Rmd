@@ -27,32 +27,85 @@ invisible(lapply(mylibrary, library, character.only = TRUE))
 ### load the data
 dat_bmw <- read.csv("BMWpricing_updated.csv")
 ```
+
 ### Data Overview
 
+Sourced from Kaggle, the dataset provides information on roughly 5000 used BMW cars sold in a business-to-business auction. Notable variables included are the price, car model, color, mileage, engine power, and various categorical descriptors.
+
 ```{r, echo = F}
-head(dat_bmw)
-length(unique(dat_bmw$model_key))
-unique(dat_bmw$paint_color)
-unique(dat_bmw$fuel)
-
-range(as.Date(dat_bmw$registration_date, format = "%d/%m/%Y"), na.rm=T)
-range(as.Date(dat_bmw$sold_at, format = "%d/%m/%Y"), na.rm=T)
-
+par(mfrow=c(2,2))
 dat_bmw[,c("price", "mileage", "engine_power")]|>
   pivot_longer(everything(), values_to = "Value", names_to = "Variable") |>
   ggplot() + geom_boxplot(aes(x=Variable, y=Value, color=Variable)) +
   labs(title = "Boxplots for Continuous Variables (Raw)")
 
-cbind(dat_bmw)|>
-  ggplot(aes(x = as.Date(registration_date, format = "%d/%m/%Y"), y = price)) +
+dat_bmw|>
+  ggplot() + geom_density(aes(x=price)) +
+  labs(title = "Density of the Variable 'Price'")
+
+dat_bmw|>
+  ggplot(aes(x = as.Date(registration_date, format = "%m/%d/%Y"), y = price)) +
   geom_point() + 
   labs(title = "Price by Vehicle Registration Date") +
   xlab("Registration Date")
 
-cbind(dat_bmw)|>
-  ggplot(aes(x = as.Date(sold_at, format = "%d/%m/%Y"), y = price)) +
-  geom_point() + 
-  labs(title = "Price by Date Sold") +
-  xlab("Date Sold")
+dat_bmw|>
+  ggplot(aes(x = as.Date(sold_at, format = "%m/%d/%Y"))) +
+  geom_bar() + 
+  labs(title = "Sales by Date of Auction") +
+  xlab("Date Sold") +
+  ylab("Number of Cars Auctioned")
+  
+```
+
+From the graphs above, along with analysis that can be found in the Appendix section, we can see that the cars from the auction were all registered between March 1990 and November 2017, and the auction took place from January to September 2018. The cars spanned 75 different BMW models, 10 different colors, and 4 different fuel types.
+
+The pricing of the cars is most concentrated around 15000, with a median price of 14200. The distribution of price is skewed heavily to the right. Because price is our main response variable, we will see that this causes the residuals of the constructed models to be right-skewed as well. The skewness of the variables can be somewhat remedied with a log-transformation on price.
+
+Although it is hard to identify the feature variables in the dataset, we can see That most of the vehicles posses features 2 and 7, while most do not have features 3, 4 and 6. Each of the features when present tend to increase the price by `$5000` to `$10000`, except for feature 7, which actually decreases the price by about `$185`
+
+Lastly, there are a few unusual values and outliers to consider in the dataset. There are two cars in the dataset that were sold for more than `$100,000` which is unusual enough to provide a high leverage and skew our constructed models. For this reason, we will remove that observation from the dataset. In addition, there is a single car with over 1 million miles on it, which we speculate was an error in data entry, so we will also remove this from the dataset. Finally, there are a number of observations with a negative mileage, or an engine power of zero. These values are also either errors in data entry, or indicative of a special case, such as scrapped or salvaged car. For this reason, we will not remove the observations, but instead set the negative and zero values to NA.
+
+```{r}
+dat_bmw_clean <- dat_bmw|>
+  filter(mileage < 500000)|>
+  filter(price < 100000)|>
+  mutate(mileage = ifelse(mileage < 0, NA, mileage))|>
+  mutate(engine_power = ifelse(engine_power <= 0, NA, engine_power))
+
+head(dat_bmw_clean)
+```
+
+### Appendix
+
+The following data chunk was used to create summary statistics for the data overview section
+
+```{r}
+length(unique(dat_bmw$model_key))
+unique(dat_bmw$paint_color)
+unique(dat_bmw$fuel)
+
+range(as.Date(dat_bmw$registration_date, format = "%m/%d/%Y"), na.rm=T)
+range(as.Date(dat_bmw$sold_at, format = "%m/%d/%Y"), na.rm=T)
+
+min(dat_bmw$mileage)
+min(dat_bmw$engine_power)
+min(dat_bmw$price)
+
+median(dat_bmw$price)
+range(dat_bmw$engine_power)
+
+mean(dat_bmw$feature_1 == T)
+mean(dat_bmw$feature_2 == T)
+mean(dat_bmw$feature_3 == T)
+mean(dat_bmw$feature_4 == T)
+mean(dat_bmw$feature_5 == T)
+mean(dat_bmw$feature_6 == T)
+mean(dat_bmw$feature_7 == T)
+mean(dat_bmw$feature_8 == T)
+
+coef(lm(dat_bmw$price ~ dat_bmw$feature_7))
+
+max(dat_bmw$mileage)
 
 ```
