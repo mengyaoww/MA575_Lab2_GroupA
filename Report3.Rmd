@@ -68,11 +68,10 @@ Lastly, there are a few unusual values and outliers to consider in the dataset. 
 
 ```{r}
 dat_bmw_clean <- dat_bmw|>
-  filter(mileage < 500000)|>
+  filter(mileage < 500000 & mileage > 0)|>
   filter(price < 100000)|>
-  mutate(mileage = ifelse(mileage < 0, NA, mileage))|>
-  mutate(engine_power = ifelse(engine_power <= 0, NA, engine_power))
-
+  filter(engine_power != 0)
+  
 head(dat_bmw_clean)
 ```
 
