@@ -243,6 +243,34 @@ ggplot() +
   theme_bw()
 ```
 
+### Which models retain value the best
+
+
+We want to find which models do not have a significantly negative relationship between price and age
+```{r}
+dat_bmw_clean <- dat_bmw_clean|>
+  mutate(age = 2018 - year(as.Date(registration_date, format = "%m/%d/%Y")))|>
+  mutate(series = substr(model_key, 1, 1))
+
+# remove series with only 1 or 2 cars belonging
+series_types = c(unique(dat_bmw_clean$series)[1:7], unique(dat_bmw_clean$series)[8:10])
+
+coefs = c()
+
+for(i in seq(1:length(series_types))){
+  temp.df <- dat_bmw_clean|>
+    filter(series == series_types[i])
+  temp.lm <- lm(log(price) ~ age, data = temp.df)
+  coefs = c(coefs, coef(temp.lm)[2])
+  
+}
+rm(temp.df)
+rm(temp.lm)
+
+coefs
+```
+Although we would need to take a closer look at the standard errors for B1 estimates calculated, the results suggest that 100 and 300 series depreciate in value the slowest as their age increases. 
+
 ### Appendix
 
 The following data chunk was used to create summary statistics for the data overview section
