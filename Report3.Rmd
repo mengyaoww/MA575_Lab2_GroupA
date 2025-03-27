@@ -178,7 +178,8 @@ diagPlot<-function(model){
     p5<-p5+scale_size_continuous("Cook's Distance", range=c(1,5))
     p5<-p5+theme_bw()+theme(legend.position="bottom")
     
-    return(list(rvfPlot=p1, qqPlot=p2, sclLocPlot=p3, rvlevPlot=p5))
+    #return(list(rvfPlot=p1, qqPlot=p2, sclLocPlot=p3, rvlevPlot=p5))
+    plot_grid(p1, p2, p3, p5, align = "h")
 }
 ```
 
@@ -197,7 +198,7 @@ avPlots(feature_model)
 Full_model <- lm(price ~ mileage + engine_power + model_series, data = dat_bmw_clean)
 summary(Full_model)
 avPlots(Full_model)
-#diagPlot(Full_model)
+diagPlot(Full_model)
 
 ```
 
@@ -213,7 +214,7 @@ ggplot(data = dat_bmw_clean, mapping = aes(x = price, y = mileage)) +
   geom_point(color = "blue", size = 0.5) +
   theme_bw()
 
-Full_model2 <- lm(price ~ mileage + engine_power + model_series + I(mileage^2), data = dat_bmw_clean)
+Full_model2 <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)), data = dat_bmw_clean)
 summary(Full_model2)
 anova(Full_model, Full_model2)
 
@@ -222,7 +223,7 @@ diagPlot(Full_model2)
 
 #### add interaction term
 ```{r}
-Full_model3 <- lm(price ~ mileage + engine_power + model_series + I(mileage^2) + mileage:engine_power, data = dat_bmw_clean)
+Full_model3 <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power, data = dat_bmw_clean)
 summary(Full_model3)
 anova(Full_model2, Full_model3)
 
