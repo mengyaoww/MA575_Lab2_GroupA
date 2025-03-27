@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 ### Loading the Library and DataSet
 
 ```{r message=FALSE}
-mylibrary <- c("tidyverse", "cowplot", "GGally", "MASS", "ggplot2", "glmnet", "data.table")
+mylibrary <- c("tidyverse", "cowplot", "GGally", "MASS", "ggplot2", "glmnet", "data.table", "car")
 invisible(lapply(mylibrary, library, character.only = TRUE))
 ### load the data
 dat_bmw <- read.csv("BMWpricing_updated.csv")
@@ -75,26 +75,36 @@ dat_bmw_clean <- dat_bmw|>
 head(dat_bmw_clean)
 ```
 
-
+```{R}
+### Create Model series variable
+dat_bmw_clean <- dat_bmw_clean %>%
+  mutate(model_series = case_when(
+    grepl("^1", model_key) ~ "1_Series",
+    grepl("^2", model_key) ~ "2_Series",
+    grepl("^3", model_key) ~ "3_Series",
+    grepl("^4", model_key) ~ "4_Series",
+    grepl("^5", model_key) ~ "5_Series",
+    grepl("^7", model_key) ~ "7_Series",
+    grepl("^M|M$", model_key) ~ "M_Power",
+    model_key %in% c("X1") ~ "X1",
+    model_key %in% c("X3") ~ "X3",
+    model_key %in% c("X5") ~ "X5",
+    model_key %in% c("X6") ~ "X6",
+    TRUE ~ "Other"
+  ))
+```
 
 ### Model
-Q1:
-Which factor among mileage, engine power, color, model, and other categorical variables impacts the price of the car the most?
+
+Q1: Which factor among mileage, engine power, color, model, and other categorical variables impacts the price of the car the most?
 
 We have selected a set of variables: Mileage(numeric), Engine Power(numeric), color(categorical factor), Model(categorical factor), and other categorical factors.
 
-We decided to fit a multiple linear regression.
-Price = $\beta_0$ + $\beta_1$(Mileage) + $\beta_2$(Engine Power) + ... = e,
+We decided to fit a multiple linear regression. Price = $\beta_0$ + $\beta_1$(Mileage) + $\beta_2$(Engine Power) + ... = e,
 
-
-The assumptions are:
-1) Linearity.The relationship between each numeric predictor and the price is assumed to be linear.
-2)Independence of Observations. Each observations should be independent of others.
-3)Constant Variance. The variance of errors is constant across the predicted values.
-4)Normality of Residuals.  The error terms should be normally distributed with mean 0.
+The assumptions are: 1) Linearity.The relationship between each numeric predictor and the price is assumed to be linear. 2)Independence of Observations. Each observations should be independent of others. 3)Constant Variance. The variance of errors is constant across the predicted values. 4)Normality of Residuals. The error terms should be normally distributed with mean 0.
 
 ```{r}
-
 # Correct model using your data frame name
 model_full <- lm(price ~ mileage + engine_power + paint_color + model_key, data = dat_bmw)
 
@@ -129,69 +139,121 @@ abline(h = 4/(nrow(dat_bmw)), col = "red")  # Threshold line
 
 ```
 
+### Quesion 1 revised
 
+#### Fit the baseline model
 
-Q2: Does our model predicts data well?
 ```{r}
-dat_bmw2 <- dat_bmw_clean[complete.cases(dat_bmw_clean), c("price", "mileage", "engine_power", "paint_color", "model_key", paste0("feature_", 1:8))] #4840 --> 4838
-##re-group model key variable due to its messy classification
-dat_bmw2$model_key2 <- ifelse(dat_bmw2$model_key %like% "X", "X", 
-                          ifelse(dat_bmw2$model_key %like% "Z", "Z",
-                                 ifelse(dat_bmw2$model_key %like% "M", "M",
-                                        ifelse(dat_bmw2$model_key %like% "i", "i", "others"
-                                        ))))
+baseline_model <- lm(price ~ mileage + engine_power, data = dat_bmw_clean)
+summary(baseline_model)
 ```
+
+#### Diagonostic of the baseline model
+
+```{r}
+### Function to create diagnostic plots
+diagPlot<-function(model){
+    p1<-ggplot(model, aes(.fitted, .resid))+geom_point()
+    p1<-p1+stat_smooth(method="loess")+geom_hline(yintercept=0, col="red", linetype="dashed")
+    p1<-p1+xlab("Fitted values")+ylab("Residuals")
+    p1<-p1+ggtitle("Residual vs Fitted Plot")+theme_bw()
+    
+    p2 <- ggplot(model, aes(sample = .stdresid)) +
+      stat_qq() +
+      stat_qq_line() +
+      xlab("Theoretical Quantiles") +
+      ylab("Standardized Residuals") +
+      ggtitle("Normal Q-Q") +
+      theme_bw()
+    
+    p3<-ggplot(model, aes(.fitted, sqrt(abs(.stdresid))))+geom_point(na.rm=TRUE)
+    p3<-p3+stat_smooth(method="loess", na.rm = TRUE)+xlab("Fitted Value")
+    p3<-p3+ylab(expression(sqrt("|Standardized residuals|")))
+    p3<-p3+ggtitle("Scale-Location")+theme_bw()
+    
+    p5<-ggplot(model, aes(.hat, .stdresid))+geom_point(na.rm=TRUE)
+    p5<-p5+stat_smooth(method="loess", na.rm=TRUE)
+    p5<-p5+xlab("Leverage")+ylab("Standardized Residuals")
+    p5<-p5+ggtitle("Residual vs Leverage Plot")
+    p5<-p5+scale_size_continuous("Cook's Distance", range=c(1,5))
+    p5<-p5+theme_bw()+theme(legend.position="bottom")
+    
+    #return(list(rvfPlot=p1, qqPlot=p2, sclLocPlot=p3, rvlevPlot=p5))
+    plot_grid(p1, p2, p3, p5, align = "h")
+}
+```
+
+```{r}
+diagPlot(baseline_model)
+```
+
+#### Added Variable Plots
+
+```{r}
+feature_model <- lm(price ~ mileage + engine_power + feature_1 + feature_2 + feature_3 + feature_4 + feature_5 + feature_6 + feature_7 + feature_8, data = dat_bmw_clean)
+avPlots(feature_model)
+```
+
+```{r}
+Full_model <- lm(price ~ mileage + engine_power + model_series, data = dat_bmw_clean)
+summary(Full_model)
+avPlots(Full_model)
+diagPlot(Full_model)
+
+```
+
+
+### model refinement
+
+Based on the curved line observed in the "Residual vs Fitted" Plot in the "Full model" and the quadratic relationship between price and mileage, we add mileage^2 to the model.  
+The fitted line in the "Residual vs Fitted" Plot is not as quadratic as it in the "Full_model". The deviated tail may be caused by potential outliers.
+
+```{r}
+ggplot(data = dat_bmw_clean, mapping = aes(x = price, y = mileage)) +
+  geom_point(color = "blue", size = 0.5) +
+  theme_bw()
+
+Full_model2 <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)), data = dat_bmw_clean)
+summary(Full_model2)
+anova(Full_model, Full_model2)
+
+diagPlot(Full_model2)
+```
+
+#### add interaction term
+```{r}
+Full_model3 <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power, data = dat_bmw_clean)
+summary(Full_model3)
+anova(Full_model2, Full_model3)
+
+diagPlot(Full_model3)
+```
+
+
+### predicting performance
 
 #### randomly divided samples into training and testing data
+
 ```{r}
 set.seed(2025)
-group <- split(sample(1:nrow(dat_bmw2)),rep(1:2, times=c(nrow(dat_bmw2)/2, nrow(dat_bmw2)/2)))
+group <- split(sample(1:nrow(dat_bmw_clean)),rep(1:2, times=c(nrow(dat_bmw_clean)/2, nrow(dat_bmw_clean)/2)))
 
-dat_train <- dat_bmw2[group$`1`, ]
-dat_test <- dat_bmw2[group$`2`, ]
+dat_train <- dat_bmw_clean[group$`1`, ]
+dat_test <- dat_bmw_clean[group$`2`, ]
 
-## fit mod2 to the training data ##
-model_full2 <- lm(price ~ mileage + engine_power + paint_color + model_key2, data = dat_bmw2)
-summary(model_full2)
-model_full_train <- lm(price ~ mileage + engine_power + paint_color + model_key2, data = dat_train)
-summary(model_full_train)
-```
-
-#### elastic net to filter feature_1 - feature_8 columns
-```{r}
-## transfer categorical to dummy variables
-X_train <- model.matrix(price ~ ., data = dat_train[,-5])[,-c(1)] ## remove intercept
-
-cvfit_elas <- cv.glmnet(X_train, dat_train$price, alpha = 0.5,
-                        penalty.factor = c(rep(0, 11),rep(1,8),rep(0,4)))
-cvfit_elas$lambda.min #14.58556
-cvfit_elas$lambda.1se #344.8741
-
-model_elas0 <- glmnet(X_train, dat_train$price, alpha = 0.5, lambda = cvfit_elas$lambda.min,
-               penalty.factor = c(rep(0, 11),rep(1,8),rep(0,4)))
-
-coef_model_elas <- data.frame(matrix(predict(model_elas0,type="coef"))) %>% mutate("predictor" = predict(model_elas0,type="coef")@Dimnames[[1]])
-colnames(coef_model_elas)[1] <- "beta"
-```
-
-#### build mode with selected features
-```{r}
-model_2 <- lm(price ~ mileage + engine_power + paint_color + model_key2 + feature_1 + feature_2 + feature_3 + feature_4 + feature_5 + feature_6 + feature_7 + feature_8, data = dat_train)
-summary(model_2)
-
-#### comparison between model_full_train and model 2 ####
-anova(model_full_train, model_2)
+## fit Full_model4 to the training data ##
+Full_model3_train <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power, data = dat_train)
+summary(Full_model3_train)
 ```
 
 #### performance on predicting
+
 ```{r}
 #### predict new data using model_full_train and model 2 ####
-dat_test$price_new1 <- predict(model_full_train, newdata = dat_test[,-1])
-dat_test$price_new2 <- predict(model_2, newdata = dat_test[,-c(1,15)])
-
+dat_test$price_new <- predict(Full_model3_train, newdata = dat_test[,-17])
 
 #### performance on predicting ####
-dat_predict <- dat_test[,c("price", "mileage", "price_new1", "price_new2")]
+dat_predict <- dat_test[,c("price", "mileage", "price_new")]
 ## R^2
 fun_r2 <- function(obe, pred){
   rss <- sum((obe-pred)^2)
@@ -200,8 +262,7 @@ fun_r2 <- function(obe, pred){
   
   return(r2)
 }
-fun_r2(dat_predict$price, dat_predict$price_new1)
-fun_r2(dat_predict$price, dat_predict$price_new2)
+fun_r2(dat_predict$price, dat_predict$price_new)
 
 ## MSE
 fun_mse <- function(obe, pred){
@@ -209,9 +270,7 @@ fun_mse <- function(obe, pred){
   
   return(mse)
 }
-
-fun_mse(dat_predict$price, dat_predict$price_new1)
-fun_mse(dat_predict$price, dat_predict$price_new2)
+fun_mse(dat_predict$price, dat_predict$price_new)
 
 ## MAE
 fun_mae <- function(obe, pred){
@@ -219,32 +278,37 @@ fun_mae <- function(obe, pred){
   
   return(mse)
 }
-fun_mae(dat_predict$price, dat_predict$price_new1)
-fun_mae(dat_predict$price, dat_predict$price_new2)
+fun_mae(dat_predict$price, dat_predict$price_new)
 
 summary(dat_predict$price)
-summary(dat_predict$price_new1)
-summary(dat_predict$price_new2)
+summary(dat_predict$price_new)
 ```
 
 #### visualization
+
 ```{r}
 dat_predict$price <- as.numeric(dat_predict$price)
 dat_predict$mileage <- as.numeric(dat_predict$mileage)
 
 ggplot() +
   geom_point(data = dat_predict, aes(x = mileage, y = price, color = "Observation"), size = 0.5) +
-  geom_point(data = dat_predict, aes(x = mileage, y = price_new1, color = "Model 1"), alpha = 0.3, size = 0.5) +
-  geom_point(data = dat_predict, aes(x = mileage, y = price_new2, color = "Model 2"), alpha = 0.3, size = 0.5) +
+  geom_point(data = dat_predict, aes(x = mileage, y = price_new, color = "Prediction"), alpha = 0.5, size = 0.5) +
   labs(title = "Prediction of Price with primary and sensitivity analysis") +
   xlab("Mileage") +
   ylab("Price") +
-  scale_color_manual(name = element_blank(), values = c("Observation" = "grey60", "Model 1" = "blue", "Model 2" = "red")) +
+  scale_color_manual(name = element_blank(), values = c("Observation" = "grey60", "Prediction" = "blue")) +
   theme_bw()
 ```
 
+
+
 ### Which models retain value the best
 
+<<<<<<< HEAD
+=======
+We want to find which models do not have a significantly negative relationship between price and age
+
+>>>>>>> f0c397048147c6ba0972e1b5f7ea88b40017b69d
 ```{r}
 dat_bmw_clean <- dat_bmw_clean|>
   mutate(age = 2018 - year(as.Date(registration_date, format = "%m/%d/%Y")))|>
@@ -270,6 +334,11 @@ rm(temp.lm)
 coefs
 confintlbs
 ```
+<<<<<<< HEAD
+=======
+
+Although we would need to take a closer look at the standard errors for B1 estimates calculated, the results suggest that 100 and 300 series depreciate in value the slowest as their age increases.
+>>>>>>> f0c397048147c6ba0972e1b5f7ea88b40017b69d
 
 ### Appendix
 
