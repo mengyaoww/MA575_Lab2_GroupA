@@ -205,7 +205,6 @@ diagPlot(Full_model)
 
 ### model refinement
 
-#### add quadratic term
 Based on the curved line observed in the "Residual vs Fitted" Plot in the "Full model" and the quadratic relationship between price and mileage, we add mileage^2 to the model.  
 The fitted line in the "Residual vs Fitted" Plot is not as quadratic as it in the "Full_model". The deviated tail may be caused by potential outliers.
 
@@ -243,7 +242,7 @@ dat_train <- dat_bmw_clean[group$`1`, ]
 dat_test <- dat_bmw_clean[group$`2`, ]
 
 ## fit Full_model4 to the training data ##
-Full_model3_train <- lm(price ~ mileage + engine_power + model_series + I(mileage^2) + mileage:engine_power, data = dat_train)
+Full_model3_train <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power, data = dat_train)
 summary(Full_model3_train)
 ```
 
