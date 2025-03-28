@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 ### Loading the Library and DataSet
 
 ```{r message=FALSE}
-mylibrary <- c("tidyverse", "cowplot", "GGally", "MASS", "ggplot2", "glmnet", "data.table", "car")
+mylibrary <- c("tidyverse", "cowplot", "GGally", "MASS", "ggplot2", "glmnet", "data.table", "car", "zoo", "TSA", "tseries")
 invisible(lapply(mylibrary, library, character.only = TRUE))
 ### load the data
 dat_bmw <- read.csv("BMWpricing_updated.csv")
@@ -301,75 +301,123 @@ ggplot() +
 ```
 
 
-
-### Which models retain value the best
-
-<<<<<<< HEAD
-=======
-We want to find which models do not have a significantly negative relationship between price and age
-
->>>>>>> f0c397048147c6ba0972e1b5f7ea88b40017b69d
+### Question 3
 ```{r}
+# create age variable
 dat_bmw_clean <- dat_bmw_clean|>
-  mutate(age = 2018 - year(as.Date(registration_date, format = "%m/%d/%Y")))|>
-  mutate(series = substr(model_key, 1, 1))
+  mutate(age = 2018 - year(as.Date(registration_date, format = "%m/%d/%Y")) - 
+           0.25 * quarter(as.Date(registration_date, format = "%m/%d/%Y")))
 
-# remove series with only 1 or 2 cars belonging
-series_types = c(unique(dat_bmw_clean$series)[1:7], unique(dat_bmw_clean$series)[8:10])
+# determine models with sufficient data
+model_candidates <- dat_bmw_clean|>
+  group_by(model_key)|>
+  summarize(n = n())|>
+  filter(n > 100)
+model_candidates
+model_candidates$model_key
 
+# narrow down number of models considered
 coefs = c()
 confintlbs = c()
 
-for(i in seq(1:length(series_types))){
+for(i in seq(1:length(model_candidates$model_key))){
   temp.df <- dat_bmw_clean|>
-    filter(series == series_types[i])
+    filter(model_key == model_candidates$model_key[i])
   temp.lm <- lm(log(price) ~ age, data = temp.df)
   coefs = c(coefs, coef(temp.lm)[2])
   confintlbs = c(confintlbs, confint(temp.lm)[2])
-  
 }
+
 rm(temp.df)
 rm(temp.lm)
 
-coefs
-confintlbs
-```
-<<<<<<< HEAD
-=======
+results = cbind(coefs, confintlbs, model_candidates$model_key)
+results
 
-Although we would need to take a closer look at the standard errors for B1 estimates calculated, the results suggest that 100 and 300 series depreciate in value the slowest as their age increases.
->>>>>>> f0c397048147c6ba0972e1b5f7ea88b40017b69d
+plot(y = dat_bmw_clean$price[which(dat_bmw_clean$model_key == "116")],
+     x = dat_bmw_clean$age[which(dat_bmw_clean$model_key == "116")])
 
-### Appendix
+plot(y = dat_bmw_clean$price[which(dat_bmw_clean$model_key == "318")],
+     x = dat_bmw_clean$age[which(dat_bmw_clean$model_key == "318")])
 
-The following data chunk was used to create summary statistics for the data overview section
+plot(y = dat_bmw_clean$price[which(dat_bmw_clean$model_key == "X1")],
+     x = dat_bmw_clean$age[which(dat_bmw_clean$model_key == "X1")])
 
-```{r}
-length(unique(dat_bmw$model_key))
-unique(dat_bmw$paint_color)
-unique(dat_bmw$fuel)
+plot(y = dat_bmw_clean$price[which(dat_bmw_clean$model_key == "X3")],
+     x = dat_bmw_clean$age[which(dat_bmw_clean$model_key == "X3")])
 
-range(as.Date(dat_bmw$registration_date, format = "%m/%d/%Y"), na.rm=T)
-range(as.Date(dat_bmw$sold_at, format = "%m/%d/%Y"), na.rm=T)
+# create time series objects for each model
 
-min(dat_bmw$mileage)
-min(dat_bmw$engine_power)
-min(dat_bmw$price)
+avg_prices <- dat_bmw_clean |>
+  filter(model_key == "116"|
+         model_key == "318"|
+         model_key == "X1"|
+         model_key == "X3")|>
+  group_by(age, model_key)|>
+  summarize(avg_price = mean(price))|>
+  arrange(model_key)
 
-median(dat_bmw$price)
-range(dat_bmw$engine_power)
+ts_116 = rep(NA, 4*(max(avg_prices$age[which(avg_prices$model_key == "116")])))
+for(i in seq(1:length(avg_prices$age[which(avg_prices$model_key == "116")]))){
+  t = 4 * avg_prices$age[which(avg_prices$model_key == "116")][i]
+  ts_116[t] = avg_prices$avg_price[which(avg_prices$model_key == "116")][i]
+}
+ts_116 = na.approx(ts_116)
+ts_318 = rep(NA, 4*(max(avg_prices$age[which(avg_prices$model_key == "318")])))
+for(i in seq(1:length(avg_prices$age[which(avg_prices$model_key == "318")]))){
+  t = 4 * avg_prices$age[which(avg_prices$model_key == "318")][i]
+  ts_318[t] = avg_prices$avg_price[which(avg_prices$model_key == "318")][i]
+}
+ts_318 = na.approx(ts_318)
+ts_X1 = rep(NA, 4*(max(avg_prices$age[which(avg_prices$model_key == "X1")])))
+for(i in seq(1:length(avg_prices$age[which(avg_prices$model_key == "X1")]))){
+  t = 4 * avg_prices$age[which(avg_prices$model_key == "X1")][i]
+  ts_X1[t] = avg_prices$avg_price[which(avg_prices$model_key == "X1")][i]
+}
+ts_X1 = na.approx(ts_X1)
+ts_X3 = rep(NA, 4*(max(avg_prices$age[which(avg_prices$model_key == "X3")])))
+for(i in seq(1:length(avg_prices$age[which(avg_prices$model_key == "X3")]))){
+  t = 4 * avg_prices$age[which(avg_prices$model_key == "X3")][i]
+  ts_X3[t] = avg_prices$avg_price[which(avg_prices$model_key == "X3")][i]
+}
+ts_X3 = na.approx(ts_X3)
 
-mean(dat_bmw$feature_1 == T)
-mean(dat_bmw$feature_2 == T)
-mean(dat_bmw$feature_3 == T)
-mean(dat_bmw$feature_4 == T)
-mean(dat_bmw$feature_5 == T)
-mean(dat_bmw$feature_6 == T)
-mean(dat_bmw$feature_7 == T)
-mean(dat_bmw$feature_8 == T)
+ts_116 = ts(ts_116, frequency = 4)
+ts_318 = ts(ts_318, frequency = 4)
+ts_X1 = ts(ts_X1, frequency = 4)
+ts_X3 = ts(ts_X3, frequency = 4)
 
-coef(lm(dat_bmw$price ~ dat_bmw$feature_7))
+adf.test(decompose(ts_116)$random[3:48]) # Result: series not should be integrated once, d = 0
+model_116 = decompose(ts_116, type = "multiplicative")
 
-max(dat_bmw$mileage)
+adf.test(decompose(ts_318)$random[3:91]) # Result: series should not be integrated once, d = 0
+model_318 = decompose(ts_318)
 
+adf.test(decompose(ts_X1)$random[3:28]) # Result: series should not be integrated, d = 0
+model_X1 = decompose(ts_X1)
+
+adf.test(decompose(ts_X3)$random[3:51]) # Result: series should not be integrated once, d = 0
+model_X3 = decompose(ts_X3)
+
+#Plot Time series data, ACF, PACF, and EACF for each model key
+
+plot(model_116)
+acf(model_116$random[3:47])
+pacf(model_116$random[3:47])
+eacf(model_116$random[3:47])
+
+plot(model_318)
+acf(model_318$random[3:91])
+pacf(model_318$random[3:91])
+eacf(model_318$random[3:91])
+
+plot(model_X1)
+acf(model_X1$random[3:26])
+pacf(model_318$random[3:26])
+
+
+plot(model_X3)
+acf(model_X3$random[3:51])
+pacf(model_X3$random[3:51])
+eacf(model_X3$random[3:51])
 ```
