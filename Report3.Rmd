@@ -306,6 +306,14 @@ ggplot() +
 ### Question 3
 ```{r}
 
+
+dat_age <- dat_bmw_clean|>
+  mutate(age = 2018 - year(as.Date(registration_date, format = "%m/%d/%Y")))|>
+  mutate(is_116 = ifelse(model_key == "116", 1, 0))|>
+  mutate(is_318 = ifelse(model_key == "318", 1, 0))|>
+  mutate(is_X1 = ifelse(model_key == "X1", 1, 0))|>
+  mutate(is_X3 = ifelse(model_key == "X3", 1, 0))
+
 # determine models with sufficient data
 model_candidates <- dat_bmw_clean|>
   group_by(model_key)|>
@@ -319,7 +327,7 @@ coefs = c()
 confintlbs = c()
 
 for(i in seq(1:length(model_candidates$model_key))){
-  temp.df <- dat_bmw_clean|>
+  temp.df <- dat_age|>
     filter(model_key == model_candidates$model_key[i])
   temp.lm <- lm(log(price) ~ age, data = temp.df)
   coefs = c(coefs, coef(temp.lm)[2])
@@ -331,13 +339,6 @@ rm(temp.lm)
 
 results = cbind(coefs, confintlbs, model_candidates$model_key)
 results
-
-dat_age <- dat_bmw_clean|>
-  mutate(age = 2018 - year(as.Date(registration_date, format = "%m/%d/%Y")))|>
-  mutate(is_116 = ifelse(model_key == "116", 1, 0))|>
-  mutate(is_318 = ifelse(model_key == "318", 1, 0))|>
-  mutate(is_X1 = ifelse(model_key == "X1", 1, 0))|>
-  mutate(is_X3 = ifelse(model_key == "X3", 1, 0))
 
 age_model <- lm(formula = price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power + age + age:is_318 + age:is_X1 + age:is_X3 + age:is_116, data = dat_age)
 summary(age_model)
