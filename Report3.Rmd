@@ -226,6 +226,7 @@ Full_model3 <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2
 summary(Full_model3)
 anova(Full_model2, Full_model3)
 anova(Full_model, Full_model3)
+anova(baseline_model, Full_model3)
 
 diagPlot(Full_model3)
 ```
