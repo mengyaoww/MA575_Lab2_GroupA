@@ -94,55 +94,8 @@ dat_bmw_clean <- dat_bmw_clean %>%
   ))
 ```
 
-### Model
-
-Q1: Which factor among mileage, engine power, color, model, and other categorical variables impacts the price of the car the most?
-
-We have selected a set of variables: Mileage(numeric), Engine Power(numeric), color(categorical factor), Model(categorical factor), and other categorical factors.
-
-We decided to fit a multiple linear regression. Price = $\beta_0$ + $\beta_1$(Mileage) + $\beta_2$(Engine Power) + ... = e,
-
-The assumptions are: 1) Linearity.The relationship between each numeric predictor and the price is assumed to be linear. 2)Independence of Observations. Each observations should be independent of others. 3)Constant Variance. The variance of errors is constant across the predicted values. 4)Normality of Residuals. The error terms should be normally distributed with mean 0.
-
-```{r}
-# Correct model using your data frame name
-model_full <- lm(price ~ mileage + engine_power + paint_color + model_key, data = dat_bmw)
-
-# View model results
-summary(model_full)
-
-# Generate diagnostic plots
-par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
-plot(model_full)
-par(mfrow = c(1, 1))  # Reset layout
-
-# Q-Q Plot for Normality
-qqnorm(resid(model_full))
-qqline(resid(model_full), col = "red")
-
-# Shapiro-Wilk test for normality
-shapiro.test(resid(model_full))  
-
-
-# Install 'car' package if necessary
-# install.packages("car")
-
-library(car)
-vif(model_full)  # Compute Variance Inflation Factor (VIF)
-
-# Compute Cook’s Distance
-cooksd <- cooks.distance(model_full)
-
-# Plot Cook’s Distance
-plot(cooksd, type = "h", main = "Cook's Distance")
-abline(h = 4/(nrow(dat_bmw)), col = "red")  # Threshold line
-
-```
-
 ### Quesion 1 revised
-
 #### Fit the baseline model
-
 ```{r}
 baseline_model <- lm(price ~ mileage + engine_power, data = dat_bmw_clean)
 summary(baseline_model)

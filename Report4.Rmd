@@ -1,0 +1,145 @@
+---
+title: "Report3"
+subtitle: "Lab2 Group A: Lee, Joshua; Liu, Kaiyi; Pulsone, Nathaniel; Wang, Mengyao; Xu, Zexian; Yang, Xiaojing"
+output: pdf_document
+subparagraph: yes
+header-includes:
+  \usepackage{titlesec}
+  \titlespacing{\title}{0pt}{\parskip}{-\parskip}
+  \usepackage{titling}
+  \setlength{\droptitle}{-10em}
+---
+
+\vspace{-10truemm}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,    # Show the R code in the final output.
+  fig.pos = "!h"  # Suggests to position figures "here" in the output.
+)
+```
+
+### Loading the Library and DataSet
+
+```{r message=FALSE}
+mylibrary <- c("tidyverse", "cowplot", "GGally", "MASS", "ggplot2", "glmnet", "data.table", "car")
+invisible(lapply(mylibrary, library, character.only = TRUE))
+### load the data
+dat_bmw <- read.csv("BMWpricing_updated.csv")
+```
+
+### Data Overview
+```{r, echo = F}
+par(mfrow=c(2,2))
+dat_bmw[,c("price", "mileage", "engine_power")]|>
+  pivot_longer(everything(), values_to = "Value", names_to = "Variable") |>
+  ggplot() + geom_boxplot(aes(x=Variable, y=Value, color=Variable)) +
+  labs(title = "Boxplots for Continuous Variables (Raw)")
+
+dat_bmw|>
+  ggplot() + geom_density(aes(x=price)) +
+  labs(title = "Density of the Variable 'Price'")
+
+dat_bmw|>
+  ggplot(aes(x = as.Date(registration_date, format = "%m/%d/%Y"), y = price)) +
+  geom_point() + 
+  labs(title = "Price by Vehicle Registration Date") +
+  xlab("Registration Date")
+
+dat_bmw|>
+  ggplot(aes(x = as.Date(sold_at, format = "%m/%d/%Y"))) +
+  geom_bar() + 
+  labs(title = "Sales by Date of Auction") +
+  xlab("Date Sold") +
+  ylab("Number of Cars Auctioned")
+  
+```
+
+```{r}
+dat_bmw_clean <- dat_bmw|>
+  filter(mileage < 500000 & mileage > 0)|>
+  filter(price < 100000)|>
+  filter(engine_power != 0)
+  
+head(dat_bmw_clean)
+```
+
+```{R}
+### Create Model series variable
+dat_bmw_clean <- dat_bmw_clean %>%
+  mutate(model_series = case_when(
+    grepl("^1", model_key) ~ "1_Series",
+    grepl("^2", model_key) ~ "2_Series",
+    grepl("^3", model_key) ~ "3_Series",
+    grepl("^4", model_key) ~ "4_Series",
+    grepl("^5", model_key) ~ "5_Series",
+    grepl("^7", model_key) ~ "7_Series",
+    grepl("^M|M$", model_key) ~ "M_Power",
+    model_key %in% c("X1") ~ "X1",
+    model_key %in% c("X3") ~ "X3",
+    model_key %in% c("X5") ~ "X5",
+    model_key %in% c("X6") ~ "X6",
+    TRUE ~ "Other"
+  ))
+```
+
+### Train Test Split
+```{R}
+train_index = which(dat_bmw_clean$obs_type == "Training")
+test_index = which(dat_bmw_clean$obs_type == "Validation")
+dat_bmw_train = dat_bmw_clean[train_index,]
+dat_bmw_test = dat_bmw_clean[test_index,]
+```
+
+#### Diagonostic of the baseline model
+
+```{r}
+### Function to create diagnostic plots
+diagPlot<-function(model){
+    p1<-ggplot(model, aes(.fitted, .resid))+geom_point()
+    p1<-p1+stat_smooth(method="loess")+geom_hline(yintercept=0, col="red", linetype="dashed")
+    p1<-p1+xlab("Fitted values")+ylab("Residuals")
+    p1<-p1+ggtitle("Residual vs Fitted Plot")+theme_bw()
+    
+    p2 <- ggplot(model, aes(sample = .stdresid)) +
+      stat_qq() +
+      stat_qq_line() +
+      xlab("Theoretical Quantiles") +
+      ylab("Standardized Residuals") +
+      ggtitle("Normal Q-Q") +
+      theme_bw()
+    
+    p3<-ggplot(model, aes(.fitted, sqrt(abs(.stdresid))))+geom_point(na.rm=TRUE)
+    p3<-p3+stat_smooth(method="loess", na.rm = TRUE)+xlab("Fitted Value")
+    p3<-p3+ylab(expression(sqrt("|Standardized residuals|")))
+    p3<-p3+ggtitle("Scale-Location")+theme_bw()
+    
+    p5<-ggplot(model, aes(.hat, .stdresid))+geom_point(na.rm=TRUE)
+    p5<-p5+stat_smooth(method="loess", na.rm=TRUE)
+    p5<-p5+xlab("Leverage")+ylab("Standardized Residuals")
+    p5<-p5+ggtitle("Residual vs Leverage Plot")
+    p5<-p5+scale_size_continuous("Cook's Distance", range=c(1,5))
+    p5<-p5+theme_bw()+theme(legend.position="bottom")
+    
+    #return(list(rvfPlot=p1, qqPlot=p2, sclLocPlot=p3, rvlevPlot=p5))
+    plot_grid(p1, p2, p3, p5, align = "h")
+}
+```
+
+
+#### add interaction term
+```{r}
+Full_model3 <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power, data = dat_bmw_clean)
+summary(Full_model3)
+
+diagPlot(Full_model3)
+```
+### Lasso Regression for variable Selection
+
+
+
+
+
+
+
+
