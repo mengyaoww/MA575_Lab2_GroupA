@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 ### Loading the Library and DataSet
 
 ```{r message=FALSE}
-mylibrary <- c("tidyverse", "cowplot", "GGally", "MASS", "ggplot2", "glmnet", "data.table", "car")
+mylibrary <- c("tidyverse", "cowplot", "GGally", "MASS", "ggplot2", "glmnet", "data.table", "car", "MLmetrics")
 invisible(lapply(mylibrary, library, character.only = TRUE))
 ### load the data
 dat_bmw <- read.csv("BMWpricing_updated.csv")
@@ -89,6 +89,29 @@ train_index = which(dat_bmw_clean$obs_type == "Training")
 test_index = which(dat_bmw_clean$obs_type == "Validation")
 dat_bmw_train = dat_bmw_clean[train_index,]
 dat_bmw_test = dat_bmw_clean[test_index,]
+```
+
+### Features of the Training Data
+```{r}
+dat_bmw_clean|>
+  ggplot(aes(x = model_series, fill = obs_type)) +
+  geom_bar() +
+  labs(title = "Car Type Data Splits") +
+  theme(axis.text.x = element_text(angle = 30))
+
+dat_bmw_clean|>
+  ggplot(aes(x = paint_color, fill = obs_type)) +
+  geom_bar() +
+  labs(title = "Car Type Data Splits") +
+  theme(axis.text.x = element_text(angle = 30))
+
+
+dat_bmw_clean[,c("price", "mileage", "engine_power", "obs_type")]|>
+  filter(obs_type == "Training")|>
+  dplyr::select(price, mileage, engine_power)|>
+  pivot_longer(everything(), values_to = "Value", names_to = "Variable") |>
+  ggplot() + geom_boxplot(aes(x=Variable, y=Value, color=Variable)) +
+  labs(title = "Boxplots for Continuous Variables (Training)")
 ```
 
 #### Diagonostic of the baseline model
@@ -175,5 +198,23 @@ lasso_coef <- coef(lasso_model, s = best_lambda)
 print(lasso_coef)
 ```
 
+### Validation and Prediction Power Metrics
+
+```{r}
+validation_data <- subset(dat_bmw_clean, obs_type == "Validation")
+newX <- model.matrix(price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power, data = validation_data)[, -1]
+
+best_model <- glmnet(x = X, y = Y, alpha = 1, lambda = best_lambda)
+
+pred_values <- predict(best_model, newx = newX)
+obs_values <- validation_data$price
+
+
+RMSE <- RMSE(pred_values, obs_values)
+MAE <- MAE(pred_values, obs_values)
+MAPE <- MAPE(pred_values, obs_values)
+
+rbind(RMSE, MAE, MAPE)
+```
 
 
