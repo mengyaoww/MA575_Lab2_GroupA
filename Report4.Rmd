@@ -172,7 +172,7 @@ diagPlot(Full_model_train)
 ### Lasso Regression for variable Selection
 ```{r}
 # Create a model matrix
-X <- model.matrix(price ~ mileage + engine_power + model_series + age + mileage:engine_power, data = dat_bmw_train)[, -1]
+X <- model.matrix(price ~ mileage + engine_power + model_series + age + I(mileage^(1/2)) + mileage:engine_power, data = dat_bmw_train)[, -1]
 
 # Create the response variable
 Y <- dat_bmw_train$price
@@ -201,7 +201,10 @@ cat("Best Lambda - LASSO:", best_lambda)
 lasso_coef <- coef(lasso_model, s = best_lambda)
 print(lasso_coef)
 ```
-
+```{r}
+reduced_model = lm(price ~ mileage + engine_power + model_series + age + I(mileage^(1/2)), data = dat_bmw_train)
+anova(Full_model_train, reduced_model)
+```
 ### Validation and Prediction Power Metrics
 
 ```{r}
