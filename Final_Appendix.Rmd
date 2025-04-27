@@ -1,0 +1,453 @@
+---
+title: "Appendix: Pricing and Market Analysis for Used BMW Cars"
+subtitle: "Lab2 Group A: Lee, Joshua; Liu, Kaiyi; Pulsone, Nathaniel; Wang, Mengyao; Xu, Zexian; Yang, Xiaojing"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+    toc_depth: '2'
+subparagraph: yes
+geometry: margin=0.5in           # narrow or widen your text area here
+fontsize: 12pt
+mainfont: "Times New Roman"
+header-includes:
+  #- \usepackage{titlesec}
+  #- \titlespacing{\title}{0pt}{\parskip}{-\parskip}
+  #- \usepackage{titling}
+  #- \setlength{\droptitle}{-5em}
+  - \usepackage{fvextra}                   # an extension of fancyvrb
+  - \fvset{breaklines=true,breakanywhere}
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,    # Show the R code in the final output.
+  fig.pos = "!h",  # Suggests to position figures "here" in the output.
+  tidy = TRUE, 
+  tidy.opts = list(width.cutoff = 60)
+)
+```
+
+
+
+
+Load in packages
+
+```{r message=FALSE}
+mylibrary <- c("tidyverse", "cowplot", "GGally", "MASS", "ggplot2", "glmnet", "data.table", "car", "MLmetrics", "patchwork")
+invisible(lapply(mylibrary, library, character.only = TRUE))
+```
+
+Function for drawing diagnostic plots
+
+```{r}
+diagPlot <- function(model){
+    p_resid <- ggplot(model, aes(.fitted, .resid)) +
+      geom_point() +
+      stat_smooth(method = "loess") +
+      geom_hline(yintercept = 0, col = "red", linetype = "dashed") +
+      xlab("Fitted values") +
+      ylab("Residuals") +
+      ggtitle("Residual vs Fitted Plot") +
+      theme_bw()
+    
+    p_QQ <- ggplot(model, aes(sample = .stdresid)) +
+      stat_qq() +
+      stat_qq_line() +
+      xlab("Theoretical Quantiles") +
+      ylab("Standardized Residuals") +
+      ggtitle("Normal Q-Q") +
+      theme_bw()
+    
+    p_SL <- ggplot(model, aes(.fitted, sqrt(abs(.stdresid)))) +
+      geom_point(na.rm=TRUE) +
+      stat_smooth(method="loess", na.rm = TRUE) +
+      xlab("Fitted Value") +
+      ylab(expression(sqrt("|Standardized residuals|"))) +
+      ggtitle("Scale-Location") +
+      theme_bw()
+    
+    p_lev <- ggplot(model, aes(.hat, .stdresid)) +
+      geom_point(na.rm=TRUE) +
+      stat_smooth(method="loess", na.rm=TRUE) +
+      xlab("Leverage") +
+      ylab("Standardized Residuals") +
+      ggtitle("Residual vs Leverage Plot") +
+      scale_size_continuous("Cook's Distance", range=c(1,5)) +
+      theme_bw() +
+      theme(legend.position="bottom")
+    
+    ## combine plots
+    plot_grid(p_resid, p_QQ, p_SL, p_lev, align = "h")
+}
+```
+
+read in dataset
+
+```{r}
+dat_bmw <- read.csv("BMWpricing_updated.csv")
+```
+
+# Data
+
+## Data Overview
+
+We first drew the scatterplot matrix between price, mileage, and engine power.
+
+```{r}
+### Create a data frame only has the variable of interests
+dat_bmw2 <- dat_bmw[,c("price", "mileage", "engine_power")]
+### Drop the data point with NA
+dat_bmw2 <- dat_bmw2[complete.cases(dat_bmw2),]
+
+ggpairs(dat_bmw2,
+        upper = list(continuous = wrap("points", alpha = 0.3, size = 0.1)),
+        lower = list(continuous = wrap("cor", size = 4))) +
+  labs(title = "Distribution and Correlation between Price, Mileage, and Engine Power") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+        axis.text.y = element_text(size = 8),
+        title = element_text(size = 12))
+```
+
+Then we investigated the distribution of price, the relationship between price and registribution date, and the sales by action date.
+
+```{r}
+p_box_conti <- dat_bmw[,c("price", "mileage", "engine_power")]|>
+  pivot_longer(everything(), values_to = "Value", names_to = "Variable") |>
+  ggplot() + geom_boxplot(aes(x=Variable, y=Value, color=Variable)) +
+  labs(title = "Boxplots for Continuous Variables") +
+  theme_bw() +
+  theme(plot.title = element_text(size = 11, face = "bold"),
+        legend.position = "none")
+
+p_price <- dat_bmw|>
+  ggplot() + geom_density(aes(x=price)) +
+  labs(title = "Density of the Variable 'Price'") +
+  theme_bw() +
+  theme(plot.title = element_text(size = 11, face = "bold"))
+
+p_price_date <- dat_bmw|>
+  ggplot(aes(x = as.Date(registration_date, format = "%m/%d/%Y"), y = price)) +
+  geom_point() + 
+  labs(title = "Price by Vehicle Registration Date") +
+  xlab("Registration Date") +
+  theme_bw() +
+  theme(plot.title = element_text(size = 11, face = "bold"))
+
+p_sale_Date <- dat_bmw|>
+  ggplot(aes(x = as.Date(sold_at, format = "%m/%d/%Y"))) +
+  geom_bar() + 
+  labs(title = "Sales by Date of Auction") +
+  xlab("Date Sold") +
+  ylab("Number of Cars Auctioned") +
+  theme_bw() +
+  theme(plot.title = element_text(size = 11, face = "bold"))
+
+plot_grid(p_box_conti, p_price, p_price_date, p_sale_Date, ncol = 2)
+```
+
+## Missing data and implausible value handling
+
+We drew the scatter plot between price and mileage to explore potential outliers. We highlighted these potential outliers.
+
+```{r}
+scatterPlotPriceMileage <- ggplot(data = dat_bmw2, mapping = aes(x = mileage, y = price)) +
+  geom_point(pch=19, cex=0.3) +  # Default points
+  geom_point(data = subset(dat_bmw2, mileage > 500000), mapping = aes(x = mileage, y = price), pch=19, cex=1, color = "red") +  # Highlight points with mileage > 500000 in red
+  geom_point(data = subset(dat_bmw2, price > 100000), mapping = aes(x = mileage, y = price), pch=19, cex=1, color = "blue") + # Highlight points with price > 100000 in blue
+  labs(title = "Scatter plot between price and mileage") +
+  theme_bw() + theme(title = element_text(size=12))
+
+scatterPlotPriceMileage
+```
+
+Before, we fit the model, we removed the outliers we observed from the scatter plot (price \> 100000 and mileage \> 500000). We reasonably conclude that these points are errors in data entry that skew the model too heavily.
+
+```{r}
+dat_bmw_clean <- dat_bmw|>
+  filter(mileage < 500000 & mileage > 0)|>
+  filter(price < 100000)|>
+  filter(engine_power != 0)
+  
+head(dat_bmw_clean)
+```
+
+We regrouped the variable "model_key" based on cars' series.
+
+```{r}
+### Create Model series variable
+dat_bmw_clean <- dat_bmw_clean %>%
+  mutate(model_series = case_when(
+    grepl("^1", model_key) ~ "1_Series",
+    grepl("^2", model_key) ~ "2_Series",
+    grepl("^3", model_key) ~ "3_Series",
+    grepl("^4", model_key) ~ "4_Series",
+    grepl("^5", model_key) ~ "5_Series",
+    grepl("^7", model_key) ~ "7_Series",
+    grepl("^M|M$", model_key) ~ "M_Power",
+    model_key %in% c("X1") ~ "X1",
+    model_key %in% c("X3") ~ "X3",
+    model_key %in% c("X5") ~ "X5",
+    model_key %in% c("X6") ~ "X6",
+    TRUE ~ "Other"
+  ))
+```
+
+# Modelling and Analysis for the Full Data Set
+
+## Question 1
+
+To explore which factor between mileage and engine power impacts the price of the car the most, we fit the baseline model: $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \epsilon$.
+
+```{r}
+baseline_model <- lm(price ~ mileage + engine_power, data = dat_bmw_clean)
+summary(baseline_model)
+
+diagPlot(baseline_model)
+```
+
+## Question 2
+
+We utilized added variable plots to solve our second question: "Which categorical predictors explain a significant amount of variance in auction price, after controlling for mileage, engine power?".
+
+We first investigated if any feature variables could explain a significant amount of variance in auction price.
+
+```{r, fig.height=7}
+feature_model <- lm(price ~ mileage + engine_power + feature_1 + feature_2 + feature_3 + feature_4 + feature_5 + feature_6 + feature_7 + feature_8, data = dat_bmw_clean)
+
+avPlots(feature_model, layout = c(4, 3))
+```
+
+We then investigated if model series could explain a significant amount of variance in auction price with model: $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \beta_3 model \hspace{1mm} series + \epsilon$. 
+
+```{r, fig.height=9}
+key_model <- lm(price ~ mileage + engine_power + model_series, data = dat_bmw_clean)
+summary(key_model)
+
+avPlots(key_model, layout = c(5, 3))
+```
+```{r}
+diagPlot(key_model)
+```
+
+## Model Refinement
+
+Based on the curved line observed in the "Residual vs Fitted" Plot in the "key_model" and the quadratic relationship between price and mileage, we add $\sqrt{mileage}$ to the model: $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \beta_3 model \hspace{1mm} series + \beta4 \sqrt{mileage} + \epsilon$. The fitted line in the "Residual vs Fitted" Plot is not as quadratic as it in the "key_model". The deviated tail may be caused by potential outliers.
+
+```{r}
+refine_model <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)), data = dat_bmw_clean)
+summary(refine_model)
+
+anova(key_model, refine_model) #partial F-test between key_model and refine_model
+
+diagPlot(refine_model)
+```
+
+We further added the interaction term between mileage and engine_power to see how engine_power influence the association between price and mileage. The model was $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \beta_3 model \hspace{1mm} series + \beta4 \sqrt{mileage} + \beta_5 mileage \times engine \hspace{1mm} power + \epsilon$
+
+```{r}
+interact_model <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power, data = dat_bmw_clean)
+summary(interact_model)
+
+anova(refine_model, interact_model)
+
+diagPlot(interact_model)
+```
+
+## Question 3
+
+We calculated the variable "age" to solve the third question: "How does the annual depreciation rate (price decrease per year of age) differ across the top five model keys?"
+
+```{r}
+dat_age <- dat_bmw_clean|>
+  mutate(age = 2018 - year(as.Date(registration_date, format = "%m/%d/%Y")))|>
+  mutate(is_116 = ifelse(model_key == "116", 1, 0))|>
+  mutate(is_318 = ifelse(model_key == "318", 1, 0))|>
+  mutate(is_X1 = ifelse(model_key == "X1", 1, 0))|>
+  mutate(is_X3 = ifelse(model_key == "X3", 1, 0))
+
+# determine models with sufficient data (n > 100)
+model_candidates <- dat_bmw_clean|>
+  group_by(model_key)|>
+  summarize(n = n())|>
+  filter(n > 100)
+model_candidates
+#model_candidates$model_key
+
+# narrow down number of models considered
+coefs = c()
+confintlbs = c()
+
+for(i in seq(1:length(model_candidates$model_key))){
+  temp.df <- dat_age|>
+    filter(model_key == model_candidates$model_key[i])
+  temp.lm <- lm(log(price) ~ age, data = temp.df)
+  coefs = c(coefs, coef(temp.lm)[2])
+  confintlbs = c(confintlbs, confint(temp.lm)[2])
+}
+
+results <- cbind(coefs, confintlbs, model_candidates$model_key)
+results
+
+age_model <- lm(formula = price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power + age + age:is_318 + age:is_X1 + age:is_X3 + age:is_116, data = dat_age)
+summary(age_model)
+
+vif(age_model)
+diagPlot(age_model)
+```
+
+## Final Model
+
+As we found before, age significantly associated with price, therefore we included it into our final model: $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \beta_3 model \hspace{1mm} series + \beta4 \sqrt{mileage} + \beta_5 mileage \times engine \hspace{1mm} power + \beta_6 age + \epsilon$.
+
+```{r}
+dat_bmw_clean$sold_at <- as.Date(dat_bmw_clean$sold_at, format = "%m/%d/%Y")
+dat_bmw_clean$registration_date <- as.Date(dat_bmw_clean$registration_date, format = "%m/%d/%Y")
+dat_bmw_clean$age <- as.numeric((dat_bmw_clean$sold_at - dat_bmw_clean$registration_date) / 365.25)
+
+final_model <- lm(formula = price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power + age, data = dat_bmw_clean)
+summary(final_model)
+
+anova(interact_model, final_model)
+
+diagPlot(final_model)
+```
+
+
+# Modelling and Analysis for the Training Data Set
+
+## Split Training and Testing Data
+
+```{r}
+train_index <- which(dat_bmw_clean$obs_type == "Training")
+test_index <- which(dat_bmw_clean$obs_type == "Validation")
+dat_bmw_train <- dat_bmw_clean[train_index,]
+dat_bmw_test <- dat_bmw_clean[test_index,]
+```
+
+## Data Overview of the Training and Testing Data
+
+```{r}
+dat_bmw_clean|>
+  ggplot(aes(x = model_series, fill = obs_type)) +
+  geom_bar() +
+  labs(title = "Car Type Data Splits") +
+  theme(axis.text.x = element_text(angle = 30)) +
+  theme_bw()
+
+dat_bmw_clean|>
+  ggplot(aes(x = paint_color, fill = obs_type)) +
+  geom_bar() +
+  labs(title = "Car Type Data Splits") +
+  theme(axis.text.x = element_text(angle = 30)) +
+  theme_bw()
+
+
+dat_bmw_clean[,c("price", "mileage", "engine_power", "obs_type")]|>
+  filter(obs_type == "Training")|>
+  dplyr::select(price, mileage, engine_power)|>
+  pivot_longer(everything(), values_to = "Value", names_to = "Variable") |>
+  ggplot() + geom_boxplot(aes(x=Variable, y=Value, color=Variable)) +
+  labs(title = "Boxplots for Continuous Variables (Training)") +
+  theme_bw()
+```
+
+
+## Final Model Fit on Training Data
+
+The final model we fit is $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \beta_3 model \hspace{1mm} series + \beta_4 age + \beta5 \sqrt{mileage} + \beta_6 mileage \times engine \hspace{1mm} power + \epsilon$.
+
+```{r}
+final_model_train <- lm(price ~ mileage + engine_power + model_series + age + I(mileage^(1/2)) + mileage:engine_power, data = dat_bmw_train)
+summary(final_model_train)
+
+diagPlot(final_model_train)
+```
+
+## Lasso Regression
+
+We performed Lasso regression for the variable selection. 
+
+```{r}
+# Create a model matrix
+X <- model.matrix(price ~ mileage + engine_power + model_series + age + I(mileage^(1/2)) + mileage:engine_power, data = dat_bmw_train)[, -1]
+
+# Create the response variable
+Y <- dat_bmw_train$price
+
+# set seed for reproductivity
+set.seed(20250408)
+
+# Fit the LASSO regression model using glmnet with alpha = 1
+lasso_model <- glmnet(x = X, y = Y, alpha = 1)
+
+# The x-axis shows log(lambda) and each line corresponds to a coefficient.
+plot(lasso_model, xvar = "lambda", label = TRUE)
+title("LASSO Coefficient Path", line = 2.5)
+```
+
+We used cross-validation to determine the lambda that minimizes the mean squared error.
+
+```{r}
+cv_model <- cv.glmnet(x = X, y = Y, alpha = 1)
+best_lambda <- cv_model$lambda.min
+
+cat("Best Lambda - LASSO:", best_lambda)
+```
+
+The coefficient for the interaction was close to 0 (i.e., $\beta_{mileage \times engine \hspace{1mm} power} = -5.87 \times 10^{-4}$). Therefore, we used partial F-test to investigate if we can remove this interaction term.
+
+```{r}
+lasso_coef <- coef(lasso_model, s = best_lambda)
+print(lasso_coef)
+
+reduced_model <- lm(price ~ mileage + engine_power + model_series + age + I(mileage^(1/2)), data = dat_bmw_train)
+anova(final_model_train, reduced_model)
+```
+
+## Prediction
+
+With the testing data, We used the coefficients from Lasso regression to evaluate the prediction performance of our final model: $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \beta_3 model \hspace{1mm} series + \beta_4 age + \beta5 \sqrt{mileage} + \beta_6 mileage \times engine \hspace{1mm} power + \epsilon$. 
+
+```{r}
+newX <- model.matrix(price ~ mileage + engine_power + model_series + age + I(mileage^(1/2)) + mileage:engine_power, data = dat_bmw_test)[, -1]
+
+best_model <- glmnet(x = X, y = Y, alpha = 1, lambda = best_lambda)
+
+pred_values <- predict(best_model, newx = newX)
+obs_values <- dat_bmw_test$price
+
+RMSE <- RMSE(pred_values, obs_values)
+MAE <- MAE(pred_values, obs_values)
+MAPE <- MAPE(pred_values, obs_values)
+
+rbind(RMSE, MAE, MAPE)
+
+summary(dat_bmw_test$price)
+summary(dat_bmw_clean$price)
+```
+
+```{r}
+dat_bmw_test$pred <- pred_values
+
+ggplot(data = dat_bmw_test, mapping = aes(x = price, y = pred)) +
+  geom_point(size = 0.7, color = "blue") +
+  labs(title = "Comparesion between Observed and Predicted Price") +
+  xlab("Observation") +
+  ylab("Prediction") +
+  geom_abline(slope = 1, intercept = 0) +
+  theme_bw()
+
+ggplot() +
+  geom_point(data = dat_bmw_test, aes(x = mileage, y = price, color = "Observation"), size = 0.7) +
+  geom_point(data = dat_bmw_test, aes(x = mileage, y = pred, color = "Prediction"), alpha = 0.5, size = 0.7) +
+  labs(title = "Comparesion between Observed and Predicted Price") +
+  xlab("Mileage") +
+  ylab("Price") +
+  scale_color_manual(name = element_blank(), values = c("Observation" = "grey60", "Prediction" = "blue")) +
+  theme_bw()
+```
+
+
