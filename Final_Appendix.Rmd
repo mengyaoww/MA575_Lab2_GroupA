@@ -451,3 +451,6 @@ ggplot() +
 ```
 
 
+# Data and Codes Availability
+
+All data and codes could be found in our GitHub repository: "https://github.com/mengyaoww/MA575_Lab2_GroupA.git".
