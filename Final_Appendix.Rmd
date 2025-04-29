@@ -195,6 +195,11 @@ dat_bmw_clean <- dat_bmw_clean %>%
   ))
 ```
 
+```{r}
+dat_bmw_clean$sold_at <- as.Date(dat_bmw_clean$sold_at, format = "%m/%d/%Y")
+dat_bmw_clean$registration_date <- as.Date(dat_bmw_clean$registration_date, format = "%m/%d/%Y")
+dat_bmw_clean$age <- as.numeric((dat_bmw_clean$sold_at - dat_bmw_clean$registration_date) / 365.25)
+```
 # Modelling and Analysis for the Full Data Set
 
 ## Question 1
@@ -223,37 +228,13 @@ avPlots(feature_model, layout = c(4, 3))
 We then investigated if model series could explain a significant amount of variance in auction price with model: $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \beta_3 model \hspace{1mm} series + \epsilon$. 
 
 ```{r, fig.height=9}
-key_model <- lm(price ~ mileage + engine_power + model_series, data = dat_bmw_clean)
+key_model <- lm(price ~ mileage + age + engine_power + I(mileage^(1/2)) + mileage:engine_power + model_series, data = dat_bmw_clean)
 summary(key_model)
 
 avPlots(key_model, layout = c(5, 3))
 ```
 ```{r}
 diagPlot(key_model)
-```
-
-## Model Refinement
-
-Based on the curved line observed in the "Residual vs Fitted" Plot in the "key_model" and the quadratic relationship between price and mileage, we add $\sqrt{mileage}$ to the model: $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \beta_3 model \hspace{1mm} series + \beta4 \sqrt{mileage} + \epsilon$. The fitted line in the "Residual vs Fitted" Plot is not as quadratic as it in the "key_model". The deviated tail may be caused by potential outliers.
-
-```{r}
-refine_model <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)), data = dat_bmw_clean)
-summary(refine_model)
-
-anova(key_model, refine_model) #partial F-test between key_model and refine_model
-
-diagPlot(refine_model)
-```
-
-We further added the interaction term between mileage and engine_power to see how engine_power influence the association between price and mileage. The model was $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \beta_3 model \hspace{1mm} series + \beta4 \sqrt{mileage} + \beta_5 mileage \times engine \hspace{1mm} power + \epsilon$
-
-```{r}
-interact_model <- lm(price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power, data = dat_bmw_clean)
-summary(interact_model)
-
-anova(refine_model, interact_model)
-
-diagPlot(interact_model)
 ```
 
 ## Question 3
@@ -267,6 +248,8 @@ dat_age <- dat_bmw_clean|>
   mutate(is_318 = ifelse(model_key == "318", 1, 0))|>
   mutate(is_X1 = ifelse(model_key == "X1", 1, 0))|>
   mutate(is_X3 = ifelse(model_key == "X3", 1, 0))
+
+dat_age$age = dat_bmw_clean$age
 
 # determine models with sufficient data (n > 100)
 model_candidates <- dat_bmw_clean|>
@@ -290,31 +273,17 @@ for(i in seq(1:length(model_candidates$model_key))){
 
 results <- cbind(coefs, confintlbs, model_candidates$model_key)
 results
+```
 
+```{r}
 age_model <- lm(formula = price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power + age + age:is_318 + age:is_X1 + age:is_X3 + age:is_116, data = dat_age)
 summary(age_model)
 
-vif(age_model)
 diagPlot(age_model)
 ```
 
 ## Final Model
-
 As we found before, age significantly associated with price, therefore we included it into our final model: $price = \beta_0 + \beta_1 mileage + \beta_2 engine \hspace{1mm} power + \beta_3 model \hspace{1mm} series + \beta4 \sqrt{mileage} + \beta_5 mileage \times engine \hspace{1mm} power + \beta_6 age + \epsilon$.
-
-```{r}
-dat_bmw_clean$sold_at <- as.Date(dat_bmw_clean$sold_at, format = "%m/%d/%Y")
-dat_bmw_clean$registration_date <- as.Date(dat_bmw_clean$registration_date, format = "%m/%d/%Y")
-dat_bmw_clean$age <- as.numeric((dat_bmw_clean$sold_at - dat_bmw_clean$registration_date) / 365.25)
-
-final_model <- lm(formula = price ~ mileage + engine_power + model_series + I(mileage^(1/2)) + mileage:engine_power + age, data = dat_bmw_clean)
-summary(final_model)
-
-anova(interact_model, final_model)
-
-diagPlot(final_model)
-```
-
 
 # Modelling and Analysis for the Training Data Set
 
@@ -352,6 +321,16 @@ dat_bmw_clean[,c("price", "mileage", "engine_power", "obs_type")]|>
   ggplot() + geom_boxplot(aes(x=Variable, y=Value, color=Variable)) +
   labs(title = "Boxplots for Continuous Variables (Training)") +
   theme_bw()
+
+ggpairs(
+  dat_bmw_train[, c("price", "mileage", "engine_power", "age")],
+  title = "Pairwise Correlations & Distributions (Training Set)",
+  upper = list(continuous = wrap("cor", size = 4)),
+  lower = list(continuous = wrap("points", alpha = 0.3, size = 0.5)),
+  diag  = list(continuous = wrap("densityDiag"))
+) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 
