@@ -231,7 +231,7 @@ We then investigated if model series could explain a significant amount of varia
 key_model <- lm(price ~ mileage + age + engine_power + I(mileage^(1/2)) + mileage:engine_power + model_series, data = dat_bmw_clean)
 summary(key_model)
 
-avPlots(key_model, layout = c(5, 3))
+avPlots(key_model, layout = c(5, 4))
 ```
 ```{r}
 diagPlot(key_model)
